@@ -852,8 +852,11 @@ def test_safe_eval_refuses_unknown_names():
 def test_rules_load_and_are_well_formed():
     rules = load_rules()
     assert len(rules) == 9
-    ids = [r.id for r in rules]
-    assert ids == sorted(ids, key=lambda i: int(i.split("-")[1]))
+    assert len({r.id for r in rules}) == 9          # ids are unique
+    # load_rules sorts by PRIORITY, not by id -- R-04 (supercritical) must be
+    # evaluated before R-01 (distillation viable)
+    priorities = [r.priority for r in rules]
+    assert priorities == sorted(priorities)
     for r in rules:
         assert r.verdict in {"feasible", "infeasible", "caution"}
         assert r.because.strip()
@@ -1109,8 +1112,6 @@ def load_rules(path: str | None = None) -> list[Rule]:
 
 Run: `cd sepsyn && ../.venv/bin/python -m pytest tests/test_engine.py -v`
 Expected: 6 passed
-
-Note: `test_rules_load_and_are_well_formed` asserts IDs sort numerically; `load_rules` sorts by priority, so if that assertion fails, change the test to sort a copy rather than changing the loader.
 
 - [ ] **Step 5: Commit**
 
