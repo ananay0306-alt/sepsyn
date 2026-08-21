@@ -56,3 +56,19 @@ def test_unknown_chemical_with_no_close_match_says_so():
     with pytest.raises(UnknownChemical) as exc:
         resolve("Zzzqqqxyw")
     assert "Zzzqqqxyw" in str(exc.value)
+
+
+def test_resolve_still_suggests_after_thermosteam_is_configured():
+    """thermosteam swaps the identifier lookup and CAS_from_any starts raising
+    LookupError instead of ValueError. Catching only ValueError meant a raw
+    traceback reached the user whenever the thermo package was in use, which
+    is always in the real tool."""
+    import contextlib, io
+    import thermosteam as tmo
+    with contextlib.redirect_stdout(io.StringIO()):
+        chems = tmo.Chemicals(["Ethanol", "Water"])
+        chems.compile()
+        tmo.settings.set_thermo(chems)
+    with pytest.raises(UnknownChemical) as exc:
+        resolve("Methanool")
+    assert _first_suggestion(str(exc.value)) == "methanol"

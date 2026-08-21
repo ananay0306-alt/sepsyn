@@ -16,12 +16,26 @@ def resolve(name: str) -> str:
 
     try:
         return chemicals.CAS_from_any(name)
-    except ValueError as exc:
+    except (ValueError, LookupError) as exc:
+        # chemicals.CAS_from_any raises ValueError on an unresolved name --
+        # but once thermosteam has configured the thermo package (which it
+        # always has in the real tool, since Task 5 imports both this module
+        # and azeotropes.py), the identifier lookup is swapped out and the
+        # same failure raises builtins.LookupError instead. Catch both, or a
+        # misspelled chemical surfaces a raw traceback instead of
+        # UnknownChemical with suggestions. Do not narrow this back down.
         # Generate suggestions on failure path only
         suggestions_text = ""
         try:
             from chemicals.identifiers import pubchem_db
-            pubchem_db.autoload_main_db()
+            # thermosteam replaces this module-level object with its own
+            # ChemicalMetadataDB (no autoload_main_db method) once the thermo
+            # package is configured. Its name_index is already populated in
+            # that case, so only call autoload_main_db when it exists rather
+            # than letting the AttributeError get swallowed below and silently
+            # drop all suggestions.
+            if hasattr(pubchem_db, "autoload_main_db"):
+                pubchem_db.autoload_main_db()
             names = list(pubchem_db.name_index.keys())
             matches = difflib.get_close_matches(name.lower(), names, n=5, cutoff=0.75)
             if matches:
