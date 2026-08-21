@@ -72,7 +72,7 @@ def test_namespace_exposes_exactly_the_rule_visible_fields():
     objects they must not. Both are pinned here."""
     rec = PropertyRecord(
         n_components=2, n_supercritical_at_feed=2, min_alpha=None,
-        has_azeotrope=False, alphas=(), feed_phase="vapor",
+        has_azeotrope=None, alphas=(), feed_phase="vapor",
         condensing_T_at_column_P=None, cooling_water_T=313.15,
         light_key_mole_fraction=None, heavy_key_mole_fraction=None,
     )

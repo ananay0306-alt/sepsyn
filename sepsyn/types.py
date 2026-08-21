@@ -57,7 +57,11 @@ class PropertyRecord:
     n_components: int
     n_supercritical_at_feed: int
     min_alpha: float | None
-    has_azeotrope: bool
+    has_azeotrope: bool | None
+    """True/False if the azeotrope search actually ran; None means it was
+    never checked (no liquid phase exists -- every component is
+    supercritical at feed conditions), which is NOT the same claim as
+    "checked and found none"."""
     alphas: tuple[Alpha, ...]
     feed_phase: str
     condensing_T_at_column_P: float | None

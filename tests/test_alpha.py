@@ -75,3 +75,24 @@ def test_light_hydrocarbon_feed_triggers_the_refrigeration_caution():
     rec = build_property_record(feed)
     assert rec.condensing_T_at_column_P is not None
     assert rec.condensing_T_at_column_P < rec.cooling_water_T
+
+
+def test_relative_volatilities_returns_data_for_a_condensable_mixture():
+    """Guards the defect this task exists to prevent: an earlier version read
+    vapour composition at V=0, where the vapour phase holds zero moles, so this
+    returned () for every mixture and min_alpha was permanently None -- which
+    silently disables R-01 and R-02."""
+    alphas = relative_volatilities(methanol_water_glycerol(), P_Pa=101325.0)
+    assert len(alphas) > 0
+    meoh_water = [a for a in alphas if set(a.pair) == {"Methanol", "Water"}]
+    assert len(meoh_water) == 1
+    assert meoh_water[0].value > 1.0
+    assert meoh_water[0].basis == "bubble point at column P"
+
+
+def test_supercritical_feed_reports_azeotrope_as_unknown_not_false():
+    """False would claim the search ran and found nothing. It never ran."""
+    rec = build_property_record(h2_methane())
+    assert rec.has_azeotrope is None
+    assert rec.min_alpha is None
+    assert rec.feed_phase == "vapor"

@@ -140,7 +140,14 @@ def relative_volatilities(feed: Feed, P_Pa: float) -> tuple[Alpha, ...]:
         for a, b in itertools.combinations(names, 2):
             xa, xb, ya, yb = xs[a], xs[b], ys[a], ys[b]
             if min(xa, xb, ya, yb) <= 0:
-                # a non-volatile such as glycerol has y = 0; alpha is undefined
+                # Guards exact zeros only. A non-volatile such as glycerol
+                # does NOT read y = 0 here -- BubblePoint gives it a tiny but
+                # strictly positive incipient vapour fraction (~1e-9), so this
+                # branch rarely triggers for it in practice. That is correct
+                # chemistry, not a bug: a near-zero vapour fraction produces a
+                # very large but finite alpha, which means the pair is
+                # trivially separable, and min_alpha (the smallest alpha
+                # returned) is unaffected by these large values.
                 continue
             out.append(Alpha(
                 pair=(a, b),
@@ -185,11 +192,14 @@ def build_property_record(
 
     if n_super == len(feed.components):
         alphas: tuple[Alpha, ...] = ()
-        azeotropes: list = []
+        # No liquid phase exists, so the azeotrope search never runs. None
+        # means "not checked" -- it must not be conflated with False, which
+        # would claim the search ran and found nothing.
+        has_azeo: bool | None = None
         phase = "vapor"
     else:
         alphas = relative_volatilities(feed, P)
-        azeotropes = find_azeotropes(list(feed.names), P)
+        has_azeo = bool(find_azeotropes(list(feed.names), P))
         phase = "vapor" if n_super > 0 else "liquid"
 
     # the most volatile component determines whether the condenser works
@@ -204,7 +214,7 @@ def build_property_record(
         n_components=len(feed.components),
         n_supercritical_at_feed=n_super,
         min_alpha=min((a.value for a in alphas), default=None),
-        has_azeotrope=bool(azeotropes),
+        has_azeotrope=has_azeo,
         alphas=alphas,
         feed_phase=phase,
         condensing_T_at_column_P=cond_T,
