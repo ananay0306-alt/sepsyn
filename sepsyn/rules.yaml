@@ -1,0 +1,108 @@
+# Separation technology screening rules.
+#
+# Conditions may reference ONLY the flat fields of PropertyRecord.as_namespace().
+# Comparisons against None evaluate to False -- a missing property never fires
+# a rule.
+#
+# Edit this file to change the tool's judgment. No Python required.
+
+- id: R-01
+  name: ordinary distillation is viable
+  priority: 10
+  when: "min_alpha >= 1.05 and n_supercritical_at_feed == 0"
+  verdict: feasible
+  technologies: [distillation]
+  because: >-
+    all components are condensable at feed conditions and the smallest relative
+    volatility is above 1.05, so ordinary distillation can achieve the split at
+    a reasonable reflux
+  cite: "Seader & Henley, Separation Process Principles, Ch.7"
+
+- id: R-02
+  name: relative volatility too low
+  priority: 20
+  when: "min_alpha < 1.05"
+  verdict: infeasible
+  technologies: [extractive_distillation, adsorption, membrane]
+  because: >-
+    below a relative volatility of about 1.05 the reflux ratio and stage count
+    required make ordinary distillation uneconomic
+  cite: "Douglas, Conceptual Design of Chemical Processes, Ch.7"
+
+- id: R-03
+  name: azeotrope blocks the split
+  priority: 20
+  when: "has_azeotrope"
+  verdict: infeasible
+  technologies: [pressure_swing, extractive_distillation, hybrid_adsorption]
+  because: >-
+    an azeotrope means relative volatility passes through 1.0, so no number of
+    stages can cross it by ordinary distillation
+  cite: "Seader & Henley, Separation Process Principles, Ch.11"
+
+- id: R-04
+  name: no condensable phase at feed
+  priority: 5
+  when: "n_supercritical_at_feed == n_components"
+  verdict: infeasible
+  technologies: [PSA, membrane, cryogenic_partial_condensation]
+  because: >-
+    every component is above its critical temperature at feed conditions, so no
+    liquid phase exists at any pressure and there is nothing for a column to
+    equilibrate
+  cite: "Seader & Henley, Separation Process Principles, Ch.1"
+
+- id: R-05
+  name: some components supercritical
+  priority: 8
+  when: "n_supercritical_at_feed > 0 and n_supercritical_at_feed < n_components"
+  verdict: caution
+  technologies: [cryogenic_partial_condensation, flash]
+  because: >-
+    some components cannot be condensed at feed conditions; a partial
+    condensation or cryogenic step is needed before any column
+  cite: "Kohl & Nielsen, Gas Purification"
+
+- id: R-06
+  name: volatility gap wide enough for a single stage
+  priority: 30
+  when: "min_alpha > 10"
+  verdict: feasible
+  technologies: [flash]
+  because: >-
+    with a relative volatility above about 10 a single equilibrium stage may
+    reach the required purity, making a full column unnecessary
+  cite: "Douglas, Conceptual Design of Chemical Processes, Ch.7"
+
+- id: R-07
+  name: dilute volatile in a liquid
+  priority: 40
+  when: "feed_phase == 'liquid' and light_key_mole_fraction < 0.05"
+  verdict: feasible
+  technologies: [stripping]
+  because: >-
+    the volatile component is dilute in a liquid, so stripping with a gas is
+    usually cheaper than boiling the whole stream
+  cite: "Seader & Henley, Separation Process Principles, Ch.6"
+
+- id: R-08
+  name: dilute solute in a gas
+  priority: 40
+  when: "feed_phase == 'vapor' and heavy_key_mole_fraction < 0.05"
+  verdict: feasible
+  technologies: [absorption]
+  because: >-
+    the heavy component is dilute in a gas, so absorption into a solvent is
+    usually cheaper than condensing the whole stream
+  cite: "Seader & Henley, Separation Process Principles, Ch.6"
+
+- id: R-09
+  name: condenser needs refrigeration
+  priority: 50
+  when: "condensing_T_at_column_P < cooling_water_T"
+  verdict: caution
+  technologies: [distillation]
+  because: >-
+    the overhead cannot be condensed against cooling water at 40 C, so
+    refrigeration is required, typically several times the cost of steam
+  cite: "Towler & Sinnott, Chemical Engineering Design, Ch.3"
