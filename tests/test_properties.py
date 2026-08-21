@@ -29,4 +29,6 @@ def test_critical_pressure_is_positive():
 def test_unknown_chemical_names_near_matches():
     with pytest.raises(UnknownChemical) as exc:
         resolve("Methanool")
-    assert "Methanool" in str(exc.value)
+    error_msg = str(exc.value)
+    assert "Methanool" in error_msg
+    assert "methanol" in error_msg.lower()
