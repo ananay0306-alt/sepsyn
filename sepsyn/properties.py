@@ -50,3 +50,20 @@ def critical_temperature(cas: str) -> float:
 def critical_pressure(cas: str) -> float:
     """Critical pressure, Pa."""
     return float(chemicals.Pc(cas))
+
+
+from sepsyn.types import Feed
+
+COOLING_WATER_T = 313.15  # K, 40 C -- design limit used throughout
+
+
+def count_supercritical(feed: Feed) -> int:
+    """How many components are above their critical temperature at feed T.
+
+    If this equals the component count there is no liquid phase and no
+    distillation is possible at any pressure.
+    """
+    return sum(
+        1 for c in feed.components
+        if feed.T_K > critical_temperature(c.cas or resolve(c.name))
+    )
