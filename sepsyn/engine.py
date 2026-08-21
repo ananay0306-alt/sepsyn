@@ -11,6 +11,8 @@ from typing import Any
 
 import yaml
 
+from sepsyn.types import PropertyRecord
+
 RULES_PATH = os.path.join(os.path.dirname(__file__), "rules.yaml")
 
 _ALLOWED_NODES = (
@@ -135,3 +137,42 @@ def load_rules(path: str | None = None) -> list[Rule]:
             ) from exc
 
     return sorted(rules, key=lambda r: (r.priority, r.id))
+
+
+_VERDICT_RANK = {"infeasible": 3, "caution": 2, "feasible": 1}
+
+
+def _names_in(expr: str) -> list[str]:
+    """Property names referenced by a condition, for the provenance record."""
+    return [
+        n.id for n in ast.walk(ast.parse(expr, mode="eval"))
+        if isinstance(n, ast.Name)
+    ]
+
+
+def evaluate(rules: list[Rule], record: PropertyRecord) -> list[Verdict]:
+    """Evaluate EVERY rule. Do not stop at the first match.
+
+    A mixture can be both low-alpha and azeotropic, and the report should say
+    both. Rules that did not fire are returned too, so a reader can see what
+    was considered rather than only what was concluded.
+    """
+    ns = record.as_namespace()
+    out: list[Verdict] = []
+    for rule in rules:
+        fired = safe_eval(rule.when, ns)
+        used = {name: ns[name] for name in _names_in(rule.when) if name in ns}
+        out.append(Verdict(
+            rule_id=rule.id, rule_name=rule.name, condition=rule.when,
+            values=used, verdict=rule.verdict,
+            technologies=rule.technologies, because=rule.because, fired=fired,
+        ))
+    return out
+
+
+def overall_verdict(verdicts: list[Verdict]) -> str:
+    """Worst verdict wins. Nothing fired means unknown, never a default."""
+    fired = [v for v in verdicts if v.fired]
+    if not fired:
+        return "unknown"
+    return max((v.verdict for v in fired), key=lambda v: _VERDICT_RANK[v])
