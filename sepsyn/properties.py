@@ -94,3 +94,121 @@ def count_supercritical(feed: Feed) -> int:
         1 for c in feed.components
         if feed.T_K > critical_temperature(c.cas or resolve(c.name))
     )
+
+
+import contextlib
+import io
+import itertools
+import warnings
+
+from sepsyn.types import Alpha, PropertyRecord
+from sepsyn.azeotropes import find_azeotropes
+
+warnings.filterwarnings("ignore")
+
+
+def relative_volatilities(feed: Feed, P_Pa: float) -> tuple[Alpha, ...]:
+    """Alpha for every adjacent pair, at the mixture bubble point.
+
+    Computed where the separation actually happens, not at feed conditions --
+    a feed at 25 C tells you nothing about a column running at 80 C.
+    """
+    import numpy as np
+    import thermosteam as tmo
+
+    names = list(feed.names)
+    out: list[Alpha] = []
+    with contextlib.redirect_stdout(io.StringIO()):
+        chems = tmo.Chemicals(names)
+        chems.compile()
+        tmo.settings.set_thermo(chems)
+        # BubblePoint, NOT Stream.vle(V=0.0): at V=0 the vapour phase holds zero
+        # moles, so a vapour composition read off the stream is all zeros and no
+        # alpha is ever computed. BubblePoint returns the incipient vapour.
+        bp = tmo.equilibrium.BubblePoint(chemicals=chems)
+        z = np.array([c.flow_kmol_hr for c in feed.components], dtype=float)
+        total = float(z.sum())
+        if total <= 0:
+            return ()
+        z = z / total
+        try:
+            T, y = bp.solve_Ty(z, P=P_Pa)
+        except Exception:
+            return ()
+        xs = dict(zip(names, [float(v) for v in z]))
+        ys = dict(zip(names, [float(v) for v in y]))
+        for a, b in itertools.combinations(names, 2):
+            xa, xb, ya, yb = xs[a], xs[b], ys[a], ys[b]
+            if min(xa, xb, ya, yb) <= 0:
+                # a non-volatile such as glycerol has y = 0; alpha is undefined
+                continue
+            out.append(Alpha(
+                pair=(a, b),
+                value=(ya / xa) / (yb / xb),
+                T_K=float(T), P_Pa=P_Pa,
+                basis="bubble point at column P",
+            ))
+    return tuple(out)
+
+
+def condensing_temperature(name: str, P_Pa: float) -> float | None:
+    """Saturation temperature of a pure component at P, or None if it cannot
+    be condensed at that pressure. Used to decide whether the overhead can be
+    condensed against cooling water or needs refrigeration."""
+    import thermosteam as tmo
+
+    cas = resolve(name)
+    if P_Pa >= critical_pressure(cas):
+        return None
+    with contextlib.redirect_stdout(io.StringIO()):
+        chems = tmo.Chemicals([name])
+        chems.compile()
+        tmo.settings.set_thermo(chems)
+        s = tmo.Stream(None, P=P_Pa)
+        s.imol[name] = 1.0
+        try:
+            s.vle(P=P_Pa, V=0.0)
+            return float(s.T)
+        except Exception:
+            return None
+
+
+def build_property_record(
+    feed: Feed,
+    column_P_Pa: float | None = None,
+    light_key: str | None = None,
+    heavy_key: str | None = None,
+) -> PropertyRecord:
+    """Assemble everything the rule engine is allowed to see."""
+    P = column_P_Pa if column_P_Pa is not None else feed.P_Pa
+    n_super = count_supercritical(feed)
+
+    if n_super == len(feed.components):
+        alphas: tuple[Alpha, ...] = ()
+        azeotropes: list = []
+        phase = "vapor"
+    else:
+        alphas = relative_volatilities(feed, P)
+        azeotropes = find_azeotropes(list(feed.names), P)
+        phase = "vapor" if n_super > 0 else "liquid"
+
+    # the most volatile component determines whether the condenser works
+    if n_super == len(feed.components):
+        cond_T = None
+    else:
+        lightest = min(feed.components, key=lambda c: boiling_point(c.cas))
+        cond_T = condensing_temperature(lightest.name, P)
+
+    fracs = feed.mole_fractions
+    return PropertyRecord(
+        n_components=len(feed.components),
+        n_supercritical_at_feed=n_super,
+        min_alpha=min((a.value for a in alphas), default=None),
+        has_azeotrope=bool(azeotropes),
+        alphas=alphas,
+        feed_phase=phase,
+        condensing_T_at_column_P=cond_T,
+        cooling_water_T=COOLING_WATER_T,
+        light_key_mole_fraction=fracs.get(light_key) if light_key else None,
+        heavy_key_mole_fraction=fracs.get(heavy_key) if heavy_key else None,
+    )
