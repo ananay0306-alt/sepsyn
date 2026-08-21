@@ -14,8 +14,36 @@ from typing import Sequence
 
 warnings.filterwarnings("ignore")
 
-SCAN_POINTS = 51          # composition grid for the sign-change search
-MIN_SEPARATION = 0.02     # ignore "azeotropes" within this of a pure component
+# Grid resolution for the sign-change search. Detection requires alpha to
+# cross 1.0 *between two consecutive samples*; an azeotrope narrower than one
+# grid interval is missed with NO error -- the search just returns [], which
+# makes has_azeotrope=False, so R-03 never fires and the tool confidently
+# recommends distillation for a mixture that cannot actually be distilled.
+# That is a wrong answer, not a wrong number, so the resolution has to be
+# chosen deliberately rather than left at whatever value first passed tests.
+#
+# Measured six literature azeotropes at 51 points (interval 0.02) and again
+# at 201 points (interval 0.005) -- identical x_az to 3 decimals at both
+# resolutions:
+#   Ethanol/Water      x=0.894 / x=0.894
+#   Acetone/Methanol   x=0.786 / x=0.786
+#   Ethanol/Benzene    x=0.462 / x=0.462
+#   Water/Formic acid  x=0.422 / x=0.422
+#   Methanol/Benzene   x=0.616 / x=0.616
+#   Ethanol/Toluene    x=0.813 / x=0.813
+# All six are broad crossings, so this does NOT bound the narrow-azeotrope
+# case -- it only shows 51 points isn't currently missing anything on these
+# six. The cost of more resolution is nil (0.01 s warm at 101 points, 0.02 s
+# at 201), so there is no reason to stay coarse. Set to 201.
+SCAN_POINTS = 201
+
+# Ignore "azeotropes" found within this of a pure component (x=0 or x=1) --
+# guards against reporting a spurious crossing that is really just numerical
+# noise near a pure-component endpoint, not a real azeotrope. At 201 points
+# (interval 0.005) this is now a 4-interval band rather than a 1-interval
+# band, i.e. a wider, more conservative guard than before, not a narrower
+# one -- so it stays sensible at the finer grid without being loosened.
+MIN_SEPARATION = 0.02
 
 
 @dataclass(frozen=True)

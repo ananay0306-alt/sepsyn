@@ -1,6 +1,7 @@
 """Chemical property lookups. Cheap and pure -- no VLE, no simulator."""
 import chemicals
 import difflib
+import warnings
 
 
 class UnknownChemical(ValueError):
@@ -42,9 +43,21 @@ def resolve(name: str) -> str:
                 suggestions_text = f"\nDid you mean: {', '.join(repr(m) for m in matches)}?"
             else:
                 suggestions_text = "\nNo similar names found in the database."
-        except Exception:
-            # If suggestion lookup fails, still raise UnknownChemical with original error
-            pass
+        except (AttributeError, KeyError, LookupError) as suggest_exc:
+            # Narrowed from a bare `except Exception: pass`, which is what let
+            # the pubchem_db swap (thermosteam replacing the module-level
+            # ChemicalMetadataDB) go undetected for a whole extra debugging
+            # round -- the guard meant to protect against a broken suggestion
+            # engine became the thing hiding it. These three types are the
+            # failure modes a swapped or renamed database actually produces
+            # (missing attribute, missing dict key, failed lookup). Anything
+            # else is a genuine bug and should propagate. UnknownChemical is
+            # still raised with the original name either way; only the
+            # suggestion text is lost, and now loudly.
+            warnings.warn(
+                f"sepsyn: chemical-name suggestion lookup failed: {suggest_exc!r}",
+                RuntimeWarning,
+            )
 
         raise UnknownChemical(
             f"Could not resolve chemical name {name!r}.{suggestions_text}"
