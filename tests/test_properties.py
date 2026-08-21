@@ -1,4 +1,5 @@
 import pytest
+import re
 from sepsyn.properties import (
     UnknownChemical, resolve, boiling_point,
     critical_temperature, critical_pressure,
@@ -26,20 +27,32 @@ def test_critical_pressure_is_positive():
     assert critical_pressure(resolve("Methane")) > 1e6
 
 
-def test_unknown_chemical_names_near_matches():
-    # Test first misspelling: Methanool -> methanol should be first
-    with pytest.raises(UnknownChemical) as exc:
-        resolve("Methanool")
-    error_msg = str(exc.value)
-    assert "Methanool" in error_msg
-    assert "Did you mean" in error_msg
-    # Extract first suggestion: after "Did you mean: '" and before "'"
-    assert "'methanol'" in error_msg, f"Expected 'methanol' as first suggestion, got: {error_msg}"
+def _first_suggestion(message: str) -> str | None:
+    """Extract the first name from a "Did you mean: 'a', 'b', ...?" message."""
+    m = re.search(r"Did you mean: '([^']+)'", message)
+    return m.group(1) if m else None
 
-    # Test second misspelling: Glycerool -> glycerol should be first
+
+@pytest.mark.parametrize("misspelling,expected", [
+    ("Methanool", "methanol"),
+    ("Glycerool", "glycerol"),
+])
+def test_unknown_chemical_suggests_the_right_name_first(misspelling, expected):
+    """The correct match must rank FIRST, not merely appear somewhere.
+
+    Asserting mere presence is not enough: without case normalisation
+    'Methanool' still yields 'methanol' in fourth place, so a presence check
+    passes against the very bug it is meant to catch.
+    """
     with pytest.raises(UnknownChemical) as exc:
-        resolve("Glycerool")
-    error_msg = str(exc.value)
-    assert "Glycerool" in error_msg
-    assert "Did you mean" in error_msg
-    assert "'glycerol'" in error_msg, f"Expected 'glycerol' as first suggestion, got: {error_msg}"
+        resolve(misspelling)
+    message = str(exc.value)
+    assert misspelling in message
+    assert "Did you mean" in message
+    assert _first_suggestion(message) == expected
+
+
+def test_unknown_chemical_with_no_close_match_says_so():
+    with pytest.raises(UnknownChemical) as exc:
+        resolve("Zzzqqqxyw")
+    assert "Zzzqqqxyw" in str(exc.value)
