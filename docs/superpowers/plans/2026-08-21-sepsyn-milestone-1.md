@@ -484,59 +484,61 @@ class Azeotrope:
     P_Pa: float
 
 
-def _relative_volatility(chem_a: str, chem_b: str, x_a: float, P_Pa: float):
-    """alpha of a over b at liquid composition x_a, at the bubble point."""
+def _alpha_curve(chem_a: str, chem_b: str, P_Pa: float) -> list[tuple[float, float, float]]:
+    """(x_a, alpha, T) across composition, at the bubble point.
+
+    Uses BubblePoint rather than Stream.vle(V=0.0). At V=0 the vapour phase
+    holds ZERO moles, so a vapour composition read off the stream is all zeros
+    and no azeotrope is ever found. BubblePoint returns the INCIPIENT vapour
+    composition, which is what relative volatility is defined against.
+
+    Chemicals and the solver are built once per pair, not once per point.
+    """
+    import numpy as np
     import thermosteam as tmo
 
-    chems = tmo.Chemicals([chem_a, chem_b])
-    chems.compile()
-    tmo.settings.set_thermo(chems)
-    s = tmo.Stream(None, P=P_Pa)
-    s.imol[chem_a] = x_a
-    s.imol[chem_b] = 1.0 - x_a
-    s.vle(P=P_Pa, V=0.0)          # bubble point
-    T = float(s.T)
-    y = s.vapor.imol
-    liq = s.liquid.imol
-    ya, yb = float(y[chem_a]), float(y[chem_b])
-    xa, xb = float(liq[chem_a]), float(liq[chem_b])
-    if min(xa, xb, ya, yb) <= 0:
-        return None, T
-    return (ya / xa) / (yb / xb), T
+    out: list[tuple[float, float, float]] = []
+    with contextlib.redirect_stdout(io.StringIO()):
+        chems = tmo.Chemicals([chem_a, chem_b])
+        chems.compile()
+        tmo.settings.set_thermo(chems)
+        bp = tmo.equilibrium.BubblePoint(chemicals=chems)
+        for i in range(1, SCAN_POINTS - 1):
+            x = i / (SCAN_POINTS - 1)
+            try:
+                T, y = bp.solve_Ty(np.array([x, 1.0 - x]), P=P_Pa)
+            except Exception:
+                continue
+            ya, yb = float(y[0]), float(y[1])
+            if min(ya, yb) <= 0:
+                continue
+            out.append((x, (ya / x) / (yb / (1.0 - x)), float(T)))
+    return out
 
 
 def find_azeotropes(names: Sequence[str], P_Pa: float = 101325.0) -> list[Azeotrope]:
     """Find binary azeotropes by scanning for alpha crossing 1.0.
 
-    An azeotrope is exactly where relative volatility equals one: the vapour
-    and liquid have the same composition, so no further separation is possible
-    by ordinary distillation.
+    An azeotrope is exactly where relative volatility equals one: vapour and
+    liquid have the same composition, so no number of stages can cross it.
     """
     results: list[Azeotrope] = []
-    with contextlib.redirect_stdout(io.StringIO()):
-        for a, b in itertools.combinations(names, 2):
-            prev_alpha = None
-            prev_x = None
-            for i in range(1, SCAN_POINTS - 1):
-                x = i / (SCAN_POINTS - 1)
-                try:
-                    alpha, T = _relative_volatility(a, b, x, P_Pa)
-                except Exception:
-                    continue
-                if alpha is None:
-                    continue
-                if prev_alpha is not None and (prev_alpha - 1.0) * (alpha - 1.0) < 0:
-                    # linear interpolation onto alpha == 1
-                    frac = (1.0 - prev_alpha) / (alpha - prev_alpha)
-                    x_az = prev_x + frac * (x - prev_x)
-                    if MIN_SEPARATION < x_az < 1.0 - MIN_SEPARATION:
-                        results.append(Azeotrope(
-                            components=(a, b),
-                            x=(x_az, 1.0 - x_az),
-                            T_K=T, P_Pa=P_Pa,
-                        ))
-                        break
-                prev_alpha, prev_x = alpha, x
+    for a, b in itertools.combinations(names, 2):
+        prev_alpha: float | None = None
+        prev_x: float | None = None
+        for x, alpha, T in _alpha_curve(a, b, P_Pa):
+            if prev_alpha is not None and (prev_alpha - 1.0) * (alpha - 1.0) < 0:
+                # linear interpolation onto alpha == 1
+                frac = (1.0 - prev_alpha) / (alpha - prev_alpha)
+                x_az = prev_x + frac * (x - prev_x)
+                if MIN_SEPARATION < x_az < 1.0 - MIN_SEPARATION:
+                    results.append(Azeotrope(
+                        components=(a, b),
+                        x=(x_az, 1.0 - x_az),
+                        T_K=T, P_Pa=P_Pa,
+                    ))
+                    break
+            prev_alpha, prev_x = alpha, x
     return results
 ```
 
@@ -549,13 +551,12 @@ If `test_ethanol_water_azeotrope_is_found` fails on composition, print the alpha
 
 ```bash
 cd sepsyn && ../.venv/bin/python -c "
-from sepsyn.azeotropes import _relative_volatility
-for i in range(1,20):
-    x=i/20
-    print(round(x,3), _relative_volatility('Ethanol','Water',x,101325.0))"
+from sepsyn.azeotropes import _alpha_curve
+for x,a,T in _alpha_curve('Ethanol','Water',101325.0)[::5]:
+    print(f'{x:.2f}  alpha={a:.3f}  T={T:.1f}')"
 ```
 
-If alpha never crosses 1.0, the thermo package is treating the pair as ideal. Set an activity model explicitly by replacing the `tmo.settings.set_thermo(chems)` line with `tmo.settings.set_thermo(chems, Gamma=tmo.equilibrium.DortmundActivityCoefficients)` and re-run.
+The controller has already measured this curve: alpha falls monotonically from 9.386 at x=0.05 to 0.934 at x=0.95, crossing 1.0 between x=0.85 (alpha 1.058) and x=0.90 (alpha 0.992). Interpolating gives x_az = 0.894 at T = 351.4 K, matching the literature 89.4 mol% and 351.3 K. If your curve differs, report what you observe rather than adjusting the test to pass.
 
 - [ ] **Step 5: Commit**
 
@@ -687,6 +688,7 @@ def relative_volatilities(feed: Feed, P_Pa: float) -> tuple[Alpha, ...]:
     Computed where the separation actually happens, not at feed conditions --
     a feed at 25 C tells you nothing about a column running at 80 C.
     """
+    import numpy as np
     import thermosteam as tmo
 
     names = list(feed.names)
@@ -695,23 +697,30 @@ def relative_volatilities(feed: Feed, P_Pa: float) -> tuple[Alpha, ...]:
         chems = tmo.Chemicals(names)
         chems.compile()
         tmo.settings.set_thermo(chems)
-        s = tmo.Stream(None, P=P_Pa)
-        for c in feed.components:
-            s.imol[c.name] = c.flow_kmol_hr
+        # BubblePoint, NOT Stream.vle(V=0.0): at V=0 the vapour phase holds zero
+        # moles, so a vapour composition read off the stream is all zeros and no
+        # alpha is ever computed. BubblePoint returns the incipient vapour.
+        bp = tmo.equilibrium.BubblePoint(chemicals=chems)
+        z = np.array([c.flow_kmol_hr for c in feed.components], dtype=float)
+        total = float(z.sum())
+        if total <= 0:
+            return ()
+        z = z / total
         try:
-            s.vle(P=P_Pa, V=0.0)
+            T, y = bp.solve_Ty(z, P=P_Pa)
         except Exception:
             return ()
-        T = float(s.T)
-        y, x = s.vapor.imol, s.liquid.imol
+        xs = dict(zip(names, [float(v) for v in z]))
+        ys = dict(zip(names, [float(v) for v in y]))
         for a, b in itertools.combinations(names, 2):
-            xa, xb, ya, yb = float(x[a]), float(x[b]), float(y[a]), float(y[b])
-            if min(xa, xb) <= 0 or min(ya, yb) <= 0:
+            xa, xb, ya, yb = xs[a], xs[b], ys[a], ys[b]
+            if min(xa, xb, ya, yb) <= 0:
+                # a non-volatile such as glycerol has y = 0; alpha is undefined
                 continue
             out.append(Alpha(
                 pair=(a, b),
                 value=(ya / xa) / (yb / xb),
-                T_K=T, P_Pa=P_Pa,
+                T_K=float(T), P_Pa=P_Pa,
                 basis="bubble point at column P",
             ))
     return tuple(out)
