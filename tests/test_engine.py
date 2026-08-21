@@ -54,6 +54,33 @@ def test_rules_load_and_are_well_formed():
 def test_every_rule_condition_evaluates_against_a_record():
     """A rule whose condition cannot be evaluated is a broken rule."""
     ns = record().as_namespace()
-    for r in load_rules():
+    rules = load_rules()
+    assert len(rules) == 9  # otherwise this test passes vacuously on []
+    for r in rules:
         result = safe_eval(r.when, ns)
         assert isinstance(result, bool)
+
+
+def test_duplicate_rule_id_is_rejected_at_load(tmp_path):
+    """A duplicate id silently shadows a rule, so it must fail loudly."""
+    p = tmp_path / "dup.yaml"
+    p.write_text(
+        "- {id: R-01, name: a, priority: 1, when: 'min_alpha > 1',\n"
+        "   verdict: feasible, technologies: [distillation], because: x}\n"
+        "- {id: R-01, name: b, priority: 2, when: 'min_alpha > 2',\n"
+        "   verdict: feasible, technologies: [distillation], because: y}\n"
+    )
+    with pytest.raises(ValueError, match="duplicate rule id"):
+        load_rules(str(p))
+
+
+def test_unparseable_condition_is_rejected_at_load(tmp_path):
+    """Today a typo'd condition only raises when that rule is first evaluated,
+    which may be never -- so the rule silently stops firing."""
+    p = tmp_path / "bad.yaml"
+    p.write_text(
+        "- {id: R-01, name: a, priority: 1, when: 'min_alpha <',\n"
+        "   verdict: feasible, technologies: [distillation], because: x}\n"
+    )
+    with pytest.raises(ValueError, match="unparseable condition"):
+        load_rules(str(p))

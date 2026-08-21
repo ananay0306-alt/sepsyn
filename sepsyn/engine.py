@@ -96,7 +96,14 @@ def safe_eval(expr: str, namespace: dict[str, Any]) -> bool:
 
 
 def load_rules(path: str | None = None) -> list[Rule]:
-    """Load the rule table, sorted by priority then id."""
+    """Load the rule table, sorted by priority then id.
+
+    Validates at load time, not evaluation time: a duplicate id would
+    silently shadow a rule, and a malformed condition would only raise
+    when that rule happened to be evaluated (which may be never). Both
+    failure modes mean a rule stops firing with no error -- exactly what
+    this tool exists to expose.
+    """
     with open(path or RULES_PATH) as fh:
         raw = yaml.safe_load(fh)
     rules = [
@@ -109,4 +116,22 @@ def load_rules(path: str | None = None) -> list[Rule]:
         )
         for r in raw
     ]
+
+    seen: dict[str, str] = {}
+    for r in rules:
+        if r.id in seen:
+            raise ValueError(
+                f"duplicate rule id {r.id!r} in {path or RULES_PATH}: "
+                f"{seen[r.id]!r} and {r.name!r}. Ids must be unique -- a "
+                f"duplicate silently shadows a rule."
+            )
+        seen[r.id] = r.name
+        try:
+            ast.parse(r.when, mode="eval")
+        except SyntaxError as exc:
+            raise ValueError(
+                f"rule {r.id} has an unparseable condition {r.when!r}: {exc}. "
+                f"A rule that cannot be parsed never fires."
+            ) from exc
+
     return sorted(rules, key=lambda r: (r.priority, r.id))
