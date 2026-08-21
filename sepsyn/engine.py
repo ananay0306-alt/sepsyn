@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-from sepsyn.types import PropertyRecord
+from sepsyn.types import PropertyRecord, RULE_VISIBLE_FIELDS
 
 RULES_PATH = os.path.join(os.path.dirname(__file__), "rules.yaml")
 
@@ -97,6 +97,17 @@ def safe_eval(expr: str, namespace: dict[str, Any]) -> bool:
     return bool(_eval(tree))
 
 
+_VERDICT_RANK = {"infeasible": 3, "caution": 2, "feasible": 1}
+
+
+def _names_in(expr: str) -> list[str]:
+    """Property names referenced by a condition, for the provenance record."""
+    return [
+        n.id for n in ast.walk(ast.parse(expr, mode="eval"))
+        if isinstance(n, ast.Name)
+    ]
+
+
 def load_rules(path: str | None = None) -> list[Rule]:
     """Load the rule table, sorted by priority then id.
 
@@ -129,25 +140,28 @@ def load_rules(path: str | None = None) -> list[Rule]:
             )
         seen[r.id] = r.name
         try:
-            ast.parse(r.when, mode="eval")
+            names = _names_in(r.when)
         except SyntaxError as exc:
             raise ValueError(
                 f"rule {r.id} has an unparseable condition {r.when!r}: {exc}. "
                 f"A rule that cannot be parsed never fires."
             ) from exc
+        for name in names:
+            if name not in RULE_VISIBLE_FIELDS:
+                raise ValueError(
+                    f"rule {r.id} references unknown property {name!r} in "
+                    f"{r.when!r}. Valid properties: {sorted(RULE_VISIBLE_FIELDS)}. "
+                    f"A rule naming a property that does not exist would abort "
+                    f"evaluation for every rule, not just this one."
+                )
+        if r.verdict not in _VERDICT_RANK:
+            raise ValueError(
+                f"rule {r.id} has verdict {r.verdict!r}; must be one of "
+                f"{sorted(_VERDICT_RANK)}. An unrecognised verdict loads and "
+                f"fires, then crashes the ranking."
+            )
 
     return sorted(rules, key=lambda r: (r.priority, r.id))
-
-
-_VERDICT_RANK = {"infeasible": 3, "caution": 2, "feasible": 1}
-
-
-def _names_in(expr: str) -> list[str]:
-    """Property names referenced by a condition, for the provenance record."""
-    return [
-        n.id for n in ast.walk(ast.parse(expr, mode="eval"))
-        if isinstance(n, ast.Name)
-    ]
 
 
 def evaluate(rules: list[Rule], record: PropertyRecord) -> list[Verdict]:

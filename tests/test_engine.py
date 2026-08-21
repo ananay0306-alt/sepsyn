@@ -1,5 +1,5 @@
 import pytest
-from sepsyn.types import PropertyRecord
+from sepsyn.types import PropertyRecord, RULE_VISIBLE_FIELDS
 from sepsyn.engine import safe_eval, load_rules
 
 
@@ -84,3 +84,50 @@ def test_unparseable_condition_is_rejected_at_load(tmp_path):
     )
     with pytest.raises(ValueError, match="unparseable condition"):
         load_rules(str(p))
+
+
+def test_unknown_property_in_condition_is_rejected_at_load(tmp_path):
+    """A misspelled property name (e.g. 'min_alpah') would otherwise raise
+    inside safe_eval at evaluation time -- and evaluate() has no per-rule
+    try/except, so ONE typo would abort the whole evaluation loop and
+    return zero verdicts for all nine rules, not just the bad one."""
+    p = tmp_path / "typo.yaml"
+    p.write_text(
+        "- {id: R-01, name: a, priority: 1, when: 'min_alpah > 1',\n"
+        "   verdict: feasible, technologies: [distillation], because: x}\n"
+    )
+    with pytest.raises(ValueError, match="unknown property"):
+        load_rules(str(p))
+
+
+def test_invalid_verdict_string_is_rejected_at_load(tmp_path):
+    """A verdict like 'Feasible' (wrong case) loads fine and fires fine, then
+    crashes _VERDICT_RANK inside overall_verdict -- after the fact, far from
+    the typo that caused it."""
+    p = tmp_path / "badverdict.yaml"
+    p.write_text(
+        "- {id: R-01, name: a, priority: 1, when: 'min_alpha > 1',\n"
+        "   verdict: Feasible, technologies: [distillation], because: x}\n"
+    )
+    with pytest.raises(ValueError, match="must be one of"):
+        load_rules(str(p))
+
+
+def test_shipped_rules_still_load_all_nine():
+    """Guard against the new validators being too strict and rejecting a
+    legitimate rule in the real rules.yaml."""
+    rules = load_rules()
+    assert len(rules) == 9
+
+
+def test_as_namespace_and_validator_share_one_source_of_truth():
+    """RULE_VISIBLE_FIELDS is the single source of truth for both the
+    namespace as_namespace() builds and the set load_rules() validates
+    conditions against. If these ever drift, a valid rule starts failing
+    validation, or an invalid one slips through."""
+    ns = record().as_namespace()
+    assert set(ns.keys()) == RULE_VISIBLE_FIELDS
+    for name in RULE_VISIBLE_FIELDS:
+        assert name in ns
+    for name in ns:
+        assert name in RULE_VISIBLE_FIELDS

@@ -1,6 +1,18 @@
 """Core data types. Flows kmol/hr, T in K, P in Pa, everywhere."""
 from dataclasses import dataclass
 
+RULE_VISIBLE_FIELDS = frozenset({
+    "n_components",
+    "n_supercritical_at_feed",
+    "min_alpha",
+    "has_azeotrope",
+    "feed_phase",
+    "condensing_T_at_column_P",
+    "cooling_water_T",
+    "light_key_mole_fraction",
+    "heavy_key_mole_fraction",
+})
+
 
 @dataclass(frozen=True)
 class Component:
@@ -71,14 +83,4 @@ class PropertyRecord:
 
     def as_namespace(self) -> dict[str, object]:
         """Flat scalars for rule evaluation. Structured fields are withheld."""
-        return {
-            "n_components": self.n_components,
-            "n_supercritical_at_feed": self.n_supercritical_at_feed,
-            "min_alpha": self.min_alpha,
-            "has_azeotrope": self.has_azeotrope,
-            "feed_phase": self.feed_phase,
-            "condensing_T_at_column_P": self.condensing_T_at_column_P,
-            "cooling_water_T": self.cooling_water_T,
-            "light_key_mole_fraction": self.light_key_mole_fraction,
-            "heavy_key_mole_fraction": self.heavy_key_mole_fraction,
-        }
+        return {name: getattr(self, name) for name in RULE_VISIBLE_FIELDS}
