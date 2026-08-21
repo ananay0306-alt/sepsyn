@@ -23,7 +23,7 @@ def resolve(name: str) -> str:
             from chemicals.identifiers import pubchem_db
             pubchem_db.autoload_main_db()
             names = list(pubchem_db.name_index.keys())
-            matches = difflib.get_close_matches(name, names, n=5, cutoff=0.75)
+            matches = difflib.get_close_matches(name.lower(), names, n=5, cutoff=0.75)
             if matches:
                 suggestions_text = f"\nDid you mean: {', '.join(repr(m) for m in matches)}?"
             else:

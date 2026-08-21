@@ -27,8 +27,19 @@ def test_critical_pressure_is_positive():
 
 
 def test_unknown_chemical_names_near_matches():
+    # Test first misspelling: Methanool -> methanol should be first
     with pytest.raises(UnknownChemical) as exc:
         resolve("Methanool")
     error_msg = str(exc.value)
     assert "Methanool" in error_msg
-    assert "methanol" in error_msg.lower()
+    assert "Did you mean" in error_msg
+    # Extract first suggestion: after "Did you mean: '" and before "'"
+    assert "'methanol'" in error_msg, f"Expected 'methanol' as first suggestion, got: {error_msg}"
+
+    # Test second misspelling: Glycerool -> glycerol should be first
+    with pytest.raises(UnknownChemical) as exc:
+        resolve("Glycerool")
+    error_msg = str(exc.value)
+    assert "Glycerool" in error_msg
+    assert "Did you mean" in error_msg
+    assert "'glycerol'" in error_msg, f"Expected 'glycerol' as first suggestion, got: {error_msg}"
