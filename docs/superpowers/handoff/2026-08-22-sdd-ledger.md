@@ -530,3 +530,74 @@ Task 11: gap found in Task 8's own tests by the re-run. Disabling report.py's
 Task 11: complete (commit 89ba49d, 92 passed). Mutation-verified with clean
   caches: RECOVERY_TOL -> 0.03 fails 1, MASS_BALANCE_TOL -> 0.01 fails 1,
   aggregate balance fails 3, running checks past a non-converged result fails 1.
+Task 12: NOT dispatched — controller implemented directly, probe first.
+Task 12: Ruling (PLAN DEFECT, the most consequential of the run): the milestone's
+  own acceptance test did not test the milestone's requirement. The design spec
+  (Scope item 2) says "distillate at 99 mol% methanol; bottoms at 1 mol%
+  methanol. Both are mole fractions of the TOTAL stream, not a keys-only
+  basis." The plan called design_if_feasible(feed, "Methanol", "Water", 0.99,
+  0.99) — those parameters are RECOVERIES — and then asserted a mole fraction
+  with abs=0.03. That is the recovery/composition conflation this entire
+  project was organised to prevent, reappearing at its final step.
+  MEASURED before ruling: the plan's substitution delivers distillate 0.99198
+  and bottoms 0.00951 against targets 0.99000 and 0.01000. Off by 0.00198 and
+  0.00049 — the same 0.002 magnitude as the Task 9 basis error — and abs=0.03
+  is 15x too loose to see it. The tool would have shipped answering a question
+  nobody asked, with a green milestone test.
+  Fix: recoveries_for_purity() solves the two-equation system exactly.
+  yD = L*Lr/(L*Lr + H*(1-Hr)); xB = L*(1-Lr)/(L*(1-Lr) + H*Hr + O).
+  Gives Lr = 0.989495, Hr = 0.987506; simulated result hits 0.99000 and 0.01000
+  to six decimals. Non-keys-to-bottoms assumption VERIFIED against the sim
+  (glycerol 25.0000 bottoms, 0.000000 overhead), and the achieved purity is
+  asserted afterwards rather than assumed, so a volatile non-key would fail
+  loudly. Raises ValueError with the offending recoveries when the target is
+  unreachable, rather than clipping outside [0,1] and letting BioSTEAM produce
+  a confusing error. Cost if wrong: one named tested function instead of a
+  substitution concealed by a tolerance.
+Task 12: Ruling: the ambiguity note must REPORT where a component went, not
+  assert it. The plan's text was "{unseparated} left together in the bottoms",
+  written without consulting the result — wrong for any volatile non-key, and
+  the same class as every "value asserting knowledge it does not have" in this
+  ledger. Now reads the split off the result and names the companions sharing
+  that stream, because "Glycerol was not separated" is half a fact; the other
+  half is that it shares the bottoms with WATER, a key the reader would assume
+  the column had dealt with.
+Task 12: plan bug that would have failed on first run: the note text contained
+  "No specification was given for separating them" but the test asserted
+  "not separated" in text.lower(). That substring is absent — "separating" is
+  not "separated". Test and implementation disagreed as written.
+Task 12: plan bug, vacuous assertion: `assert "FEASIBLE" in out.upper()` PASSES
+  on INFEASIBLE, which contains FEASIBLE as a substring. The CLI acceptance
+  test could not distinguish the two possible answers. Now asserts the verdict
+  line "distillation FEASIBLE" and that INFEASIBLE is absent.
+Task 12: MY OWN vacuous assertion, caught by mutation not by reading:
+  test_the_flag_names_what_glycerol_was_not_separated_FROM asserted "Water" in
+  the whole report text. "Water" appears in the products table and twice in the
+  verification block, so removing the companion naming from the note left the
+  test passing. Now scoped to the note line itself. Third same-shaped mistake
+  of mine this run (Task 9's tolerance, Task 11's alpha-branch gap, this) —
+  every one found by mutation, none by re-reading.
+Task 12: MILESTONE CRITERIA VERIFIED BY HAND, not assumed:
+  - pytest: 107 passed.
+  - H2/methane: INFEASIBLE, R-04 only, PSA / membrane /
+    cryogenic_partial_condensation.
+  - MeOH/H2O/glycerol: R-01 fires, one column, distillate 99.000% methanol and
+    bottoms 1.000% on the TOTAL basis, all five verification checks PASS,
+    glycerol flagged as unseparated from water.
+  - --explain prints the eight rules that did not fire with their values.
+  - rules.yaml editable without touching Python: raised R-01's threshold
+    1.05 -> 5.0 in YAML only; verdict went FEASIBLE -> UNKNOWN and the tool
+    refused to guess rather than falling through permissively. Restored after.
+    (First attempt at this check used a wrong anchor string and silently edited
+    nothing; the harness assert caught it. Same lesson as the bytecode trap —
+    prove the mutation landed before believing the result.)
+Task 12: complete (commit afb3f7d, 107 passed). Mutation-verified: passing
+  purities through as recoveries fails the milestone assertion; suppressing the
+  ambiguity flag fails 2; dropping the companion naming fails 1; ignoring the
+  non-key components in the purity solve fails 1.
+
+## MILESTONE 1 COMPLETE
+All twelve tasks done, 107 tests passing, both acceptance tests and the
+negative acceptance test green. Four plan defects were found by probing before
+implementation (Tasks 4, 10, 12 and Task 9's tolerance); none would have been
+caught by the plan's own tests.

@@ -1,7 +1,8 @@
 # sepsyn milestone 1 — handoff
 
 **Written 2026-08-22 after Task 8 passed acceptance test 1; updated the same
-day after Task 8's review and Tasks 9-11.** Branch `milestone-1`, 92 tests passing.
+day after Task 8's review and Tasks 9-12.** Branch `milestone-1`, **milestone 1
+complete**, 107 tests passing.
 
 The full SDD ledger (13 rulings, 15 deferred minors) is copied alongside this
 file as `2026-08-22-sdd-ledger.md`. It originally lived in `.superpowers/`,
@@ -23,10 +24,22 @@ the workspace being cleaned.
 | 9 Simulator protocol + BioSTEAM adapter | complete | 0 |
 | 10 Pressure rule + reflux sweep | complete | 0 |
 | 11 Verification | complete | 0 |
-| 12 **Acceptance test 2** + ambiguity flag + negative test | not started | |
+| 12 **Acceptance test 2** + ambiguity flag + negative test | complete | 0 |
 
-**Immediate next action:** Task 12 — acceptance test 2, the ambiguity flag and
-the negative test — with BASE `89ba49d`. This is the milestone.
+**Immediate next action:** none — milestone 1 is done. All five success criteria
+were checked by hand, not inferred from the suite passing:
+
+| criterion | verified |
+|---|---|
+| `pytest tests/` green | 107 passed |
+| H2/methane INFEASIBLE citing R-04, names PSA/membrane | yes |
+| MeOH/H2O/glycerol verified column + glycerol flag | yes, 99.000% / 1.000% total basis |
+| `--explain` prints rules that did not fire, with values | yes, all eight |
+| `rules.yaml` changes judgment without touching Python | R-01 threshold 1.05 -> 5.0 flipped FEASIBLE -> UNKNOWN |
+
+Merging `milestone-1` into `main` is the natural next step; milestone 2 (the
+spec names sequencing, DWSIM cross-validation, literature RAG and an LLM
+interface as separate milestones) needs its own spec first.
 
 ## What Task 8 settled
 
@@ -114,11 +127,14 @@ These cost real time to discover. Anyone continuing should not re-derive them.
   BioSTEAM's 1.1e-16 actual error. `MASS_BALANCE_TOL = 1e-3` is the weaker of
   the two — no known defect signature, just measured 1e-6 closure — and is
   pinned by a 0.3% single-component test.
-- **Task 12's ambiguity flag is the point of acceptance test 2**, not a nicety.
-  The methanol/water/glycerol problem specifies only methanol purity; water and
-  glycerol are never separated from each other. The tool must answer the literal
-  question AND print that it did not separate them. Answering silently would be
-  the failure the test exists to catch.
+- **SETTLED IN TASK 12: purity targets are converted, never substituted.** The
+  spec's 99 mol% is a TOTAL-stream mole fraction; `ColumnSpec` is in
+  recoveries. `recoveries_for_purity` solves between them exactly. Passing a
+  purity where a recovery is expected lands at 0.99198 against a 0.99000
+  target. Do not "simplify" that function away.
+- **The ambiguity note reads the split off the result.** It reports where a
+  non-key actually went and who it stayed mixed with. Never restore the earlier
+  wording that asserted "left together in the bottoms" without looking.
 - **BioSTEAM imports in ~8 s, not ~70 s.** The earlier figure in this file was
   wrong; measured at 8.4 s on this machine. The full 69-test suite runs in
   about 9 s. If a run hangs, it is a hang, not the import.
