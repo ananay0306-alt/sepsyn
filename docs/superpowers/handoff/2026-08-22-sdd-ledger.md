@@ -419,3 +419,61 @@ Task 9: fix rounds 0 — but two vacuous tests were caught and rewritten BEFORE
 Task 9: complete (commit 95cedf5, 69 passed). Mutation-verified three ways:
   recovery/mole-fraction conflation fails 2 tests, keys-only reporting fails 3,
   removing the flash DOF guard fails 2.
+Task 10: NOT dispatched — controller implemented directly, probe first, as Task 9.
+Task 10: Ruling (PLAN DEFECT, found by controller probing before writing):
+  choose_pressure NEVER SOLVED FOR PRESSURE. The plan built a Stream, called
+  s.vle(T=COOLING_WATER_T, V=0.0) and read s.P back. That call does not set P.
+  Measured across seven chemicals: methanol, water, propane, n-butane and
+  propylene ALL returned exactly 101325.0 — the tmo.Stream default, untouched.
+  Water and propane cannot both saturate at 1.01325 bar; the identical round
+  number across chemically unrelated inputs is the tell, same as the Task 4
+  vapour-accessor defect one task earlier.
+  Consequences: (a) the raise-the-pressure branch was UNREACHABLE DEAD CODE;
+  (b) the tool would report "atmospheric is sufficient" for every non-
+  supercritical light key, so propane (13.7 bar required) is told 1 atm works —
+  a wrong ANSWER, silently, with a confident note attached.
+  Fix: tmo.Chemical(name).Psat(T). Verified against literature at 313.15 K
+  before adopting — methanol 0.3552 vs 0.354, water 0.0738 vs 0.0738, propane
+  13.694 vs 13.71, n-butane 3.785 vs 3.784, propylene 16.48 vs 16.06.
+  BubblePoint.solve_Py agrees to all digits, so the two independent routes
+  cross-check. Cost if wrong: Psat is a pure-component correlation lookup, far
+  cheaper than the VLE solve it replaces.
+Task 10: NEITHER PLANNED TEST COULD CATCH IT. test_atmospheric_is_enough_for_
+  methanol asserted P == 101325 and passed — the right answer for the wrong
+  reason, since the broken code returns 101325 unconditionally.
+  test_light_component_needs_pressure_or_refrigeration used ethylene, which is
+  supercritical at cooling-water temperature and returns from the FIRST branch,
+  never reaching the broken code at all. Two green tests over a dead heuristic.
+  The lesson is about branch REACHABILITY, not assertion strength: coverage
+  that never executes the interesting branch hides this whole defect class.
+Task 10: Ruling: choose the test chemicals BY their measured saturation
+  pressure so each branch is actually reached. Probed candidates first:
+  methanol 0.36 bar (atmospheric), ammonia 15.55 bar (raise), hydrogen chloride
+  65.56 bar (past the 30 bar cap), ethylene Tc 282 K (supercritical). Also
+  added a defect-class guard asserting three chemicals do not all return the
+  same pressure, which fails against any future "returned a default" bug
+  regardless of which call is at fault. Cost if wrong: none, tests only.
+Task 10: Ruling: sweep_reflux must KEEP non-converged points, not `continue`
+  past them. Silently skipping returns a curve that looks complete while hiding
+  the region the column cannot be built in — and that region borders minimum
+  reflux, so it is the interesting one. SweepPoint gains converged/error
+  mirroring ColumnResult, so the codebase has one shape for "failure as data".
+  best_point filters to converged and reports how many were attempted when none
+  survive. Same standard already applied to the property record (Task 5) and the
+  report (Task 8): do not present an absence as a finding.
+  Cost if wrong: callers reading .stages must check .converged, which is the
+  point.
+Task 10: added a fake FailingSimulator in the tests. base.py's docstring claims
+  the protocol exists so design code can be tested "against a fake with no
+  chemistry"; until now every test used the real BioSTEAM adapter, so that claim
+  was unexercised. The failure tests need determinism anyway.
+Task 10: MEASURED the cost curve before asserting on it. Annualised cost over
+  k = 1.02..3.0: 541k, 479k, 459k, 448.7k (k=1.20, minimum), 456k, 464k, 475k,
+  487k, 502k, 541k, 678k. A genuine interior knee, so the sweep is not an
+  arbitrary range choice — test_the_cost_curve_has_an_interior_minimum pins
+  that the optimum is strictly inside the swept range. Stages fall 92 -> 24 but
+  NOT monotonically (31 at k=1.6, 32 at k=1.7), so only first-vs-last is
+  asserted; a strict monotonicity check would fail on numerical noise.
+Task 10: complete (commit cfedb0d, 80 passed). Mutation-verified: reinstating
+  the default-pressure read fails 3 tests, the silent drop fails 1, removing
+  best_point's converged filter fails 1.

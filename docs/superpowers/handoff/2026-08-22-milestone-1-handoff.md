@@ -1,7 +1,8 @@
 # sepsyn milestone 1 — handoff
 
 **Written 2026-08-22 after Task 8 passed acceptance test 1; updated the same
-day after Task 8's review and Task 9.** Branch `milestone-1`, 69 tests passing.
+day after Task 8's review, Task 9 and Task 10.** Branch `milestone-1`, 80 tests
+passing.
 
 The full SDD ledger (13 rulings, 15 deferred minors) is copied alongside this
 file as `2026-08-22-sdd-ledger.md`. It originally lived in `.superpowers/`,
@@ -21,12 +22,11 @@ the workspace being cleaned.
 | 7 Evaluate all rules | complete | 1 |
 | 8 Report + CLI + **acceptance test 1** | complete | 1 |
 | 9 Simulator protocol + BioSTEAM adapter | complete | 0 |
-| 10 Pressure rule + reflux sweep | not started | |
+| 10 Pressure rule + reflux sweep | complete | 0 |
 | 11 Verification | not started | |
 | 12 **Acceptance test 2** + ambiguity flag + negative test | not started | |
 
-**Immediate next action:** Task 10 (column pressure rule + reflux sweep) with
-BASE `95cedf5`.
+**Immediate next action:** Task 11 (verification of a design) with BASE `cfedb0d`.
 
 ## What Task 8 settled
 
@@ -91,6 +91,16 @@ These cost real time to discover. Anyone continuing should not re-derive them.
   mutation pass. Recovery is exact by definition; `abs=5e-4` is deliberate.
 - **`Simulator` leaks no BioSTEAM types.** No `Stream`, no `Unit` crosses
   `base.py`. That is what makes DWSIM a second file rather than a refactor.
+- **`choose_pressure` uses `Chemical.Psat`, never a VLE call.** The plan used
+  `s.vle(T=..., V=0.0)` then read `s.P`, which does not solve for pressure and
+  returned exactly 101325.0 for every chemical — dead-coding the raise-pressure
+  branch and telling the user 1 atm suffices for propane. If you touch this,
+  re-check that three different chemicals give three different pressures;
+  there is a test for exactly that.
+- **`sweep_reflux` keeps failed points in the curve.** They carry
+  `converged=False` and an error, mirroring `ColumnResult`. Do not "tidy" them
+  out — the unbuildable region borders minimum reflux and is the interesting
+  part. `best_point` filters them.
 - **Task 12's ambiguity flag is the point of acceptance test 2**, not a nicety.
   The methanol/water/glycerol problem specifies only methanol purity; water and
   glycerol are never separated from each other. The tool must answer the literal
@@ -110,6 +120,22 @@ error. Task 9 added a third face of the same coin: **a tolerance wide enough to
 swallow the defect the test was written for.** Whenever a quantity is exact by
 construction — a recovery, a mass balance — assert it tightly, and set the
 tolerance from a measurement of the wrong answer rather than by habit.
+
+Task 10 added a fourth: **a test that never reaches the branch it names.** Both
+of its planned tests passed against a `choose_pressure` that never computed a
+pressure — one got the right answer for the wrong reason, the other returned
+from an earlier branch. Assertion strength was not the problem; reachability
+was. When a function has branches, pick inputs that provably land in each one,
+and prefer a real measurement to decide which input does that. A defect that
+survives because no test executes the line is invisible to every check aimed at
+assertions.
+
+The two plan defects so far (Task 4's vapour accessor, Task 10's pressure read)
+share a signature worth naming: **a call that looks like it computes and
+silently returns a default instead.** Both showed up as an implausibly uniform
+number across unrelated inputs — every azeotrope search returning `[]`, every
+chemical saturating at exactly 1.01325 bar. When a sweep of different inputs
+gives suspiciously identical output, suspect the accessor before the chemistry.
 
 The check that caught most of them: take the fix out, confirm the test now
 fails, put it back. If the test still passes with the fix removed, it is not
