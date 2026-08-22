@@ -359,3 +359,63 @@ Task 8: fix round 1/5 (commit 7823e9b) — Important finding ADDRESSED by the
   58 passed. Acceptance test 1 output unchanged apart from the reworded alpha
   line, which its assertions do not touch.
 Task 8: complete (commits 02c49e8..7823e9b, review clean after 1 fix round)
+Task 9: NOT dispatched — implemented by the controller directly at the user's
+  instruction ("probe, then implement"). No implementer or reviewer subagent.
+Task 9: controller probe BEFORE writing code, per the Task 4 precedent:
+  - bst 2.53.11 / tmo 0.53.5. BinaryDistillation, Flash, main_flowsheet.clear
+    all present with the names the plan uses.
+  - design_results carries 'Actual stages', 'Minimum reflux', 'Reflux' — the
+    plan's three .get() reads are correct.
+  - Reversed keys raise RuntimeError("cannot meet specifications! stages > 100"),
+    so the impossible-spec test fails for the RIGHT reason, not a setup error.
+  - Flash accepts T+P, P+V and T+V; all three converge.
+  - BIOSTEAM IMPORTS IN 8 s, NOT ~70 s. The handoff's warning was wrong.
+    Corrected there so nobody budgets for a hang that does not happen.
+Task 9: Ruling (PLAN AMENDMENT): pass recoveries straight through via
+  product_specification_format="Recovery" with Lr/Hr; delete
+  _recovery_to_keys_basis entirely. BioSTEAM accepts recoveries natively and
+  Lr/Hr are exactly ColumnSpec's two fields. VERIFIED the plan's conversion is
+  arithmetically CORRECT first — both routes give MeOH recovery 0.99000 and H2O
+  recovery to bottoms 0.99000 — so this is not a bug fix, it is the removal of
+  an unnecessary basis change. The handoff proposed containing the conversion's
+  risk in "one tested place"; the safest version of a dangerous conversion is
+  the one that does not exist. Recovery format also rejects Lr=1.5 with "light
+  key recovery in the distillate must be a fraction", a better failure than the
+  composition path. Cost if wrong: the deleted conversion is verified correct
+  and preserved in this ledger and in git, so reverting is a paste.
+Task 9: THE TOLERANCE WAS THE DEFECT. The plan's basis test asserted
+  recovery == approx(0.99, abs=0.02). Measured divergence between the correct
+  basis and the wrong one is 0.002 in recovery (MeOH overhead 99.0000 vs
+  99.2020 kmol/hr). The plan's tolerance was FORTY TIMES too loose to detect
+  the error the recovery spec exists to prevent — the assertion guarding the
+  project's most important interface decision could not fail against that
+  defect. My own first rewrite used abs=0.005, still 2.5x too loose, and
+  MUTATION A SURVIVED IT: conflating recovery with mole fraction passed all 10
+  tests including the one named "THE basis test". Caught only by running the
+  mutation, not by reading. Recovery is exact by definition, so the tolerance
+  should have been near-zero from the start; a loose tolerance on an exact
+  quantity is always a smell. Now abs=5e-4 plus a direct assertion on the molar
+  amount (99.0 kmol/hr), plus a premise guard that the two bases remain
+  numerically distinguishable in this feed.
+Task 9: SECOND VACUOUS TEST, same round: test_flash_needs_two_specifications
+  asserted converged is False and an error present. It passed with the adapter's
+  degrees-of-freedom guard removed, because BioSTEAM independently raises
+  AssertionError("must pass two and only two of ... T, P, V, H, S, x, y"). The
+  test was reading BioSTEAM's error and proving nothing about sepsyn's guard —
+  "break the specific thing whose failure you are testing", the corollary the
+  handoff already records. Kept the guard because BioSTEAM's message names four
+  specifications FlashSpec does not expose; the test now asserts sepsyn's own
+  wording ("vapor_fraction", "two degrees of freedom") and is parametrized over
+  both under- and over-specification.
+Task 9: gap in the plan closed: design_flash had NO test at all, so half the
+  Simulator protocol would have shipped unexercised. Added flash split with a
+  closing mass balance, plus the two DOF cases.
+Task 9: added beyond the plan: mass balance closes to rel=1e-6 on every
+  component, and every feed component appears in both product dicts. Mutation:
+  reporting only the keys fails 3 tests.
+Task 9: fix rounds 0 — but two vacuous tests were caught and rewritten BEFORE
+  commit by the controller's own mutation run. Had they been committed they
+  would have been the thirteenth and fourteenth instances of the pattern.
+Task 9: complete (commit 95cedf5, 69 passed). Mutation-verified three ways:
+  recovery/mole-fraction conflation fails 2 tests, keys-only reporting fails 3,
+  removing the flash DOF guard fails 2.

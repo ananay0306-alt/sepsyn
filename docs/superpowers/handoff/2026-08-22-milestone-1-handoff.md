@@ -1,7 +1,7 @@
 # sepsyn milestone 1 — handoff
 
 **Written 2026-08-22 after Task 8 passed acceptance test 1; updated the same
-day after Task 8's review.** Branch `milestone-1`, 58 tests passing.
+day after Task 8's review and Task 9.** Branch `milestone-1`, 69 tests passing.
 
 The full SDD ledger (13 rulings, 15 deferred minors) is copied alongside this
 file as `2026-08-22-sdd-ledger.md`. It originally lived in `.superpowers/`,
@@ -20,12 +20,13 @@ the workspace being cleaned.
 | 6 Rule table + evaluator | complete | 1 |
 | 7 Evaluate all rules | complete | 1 |
 | 8 Report + CLI + **acceptance test 1** | complete | 1 |
-| 9 Simulator protocol + BioSTEAM adapter | not started | |
+| 9 Simulator protocol + BioSTEAM adapter | complete | 0 |
 | 10 Pressure rule + reflux sweep | not started | |
 | 11 Verification | not started | |
 | 12 **Acceptance test 2** + ambiguity flag + negative test | not started | |
 
-**Immediate next action:** dispatch Task 9 with BASE `7823e9b`.
+**Immediate next action:** Task 10 (column pressure rule + reflux sweep) with
+BASE `95cedf5`.
 
 ## What Task 8 settled
 
@@ -76,28 +77,39 @@ These cost real time to discover. Anyone continuing should not re-derive them.
 
 ## Hazards waiting in Tasks 9–12
 
-- **Task 9's `ColumnSpec` takes recoveries, not mole fractions.** This is the
-  single most important interface decision in the project. Recovery means the
-  same thing in every simulator; mole fraction does not — BioSTEAM divides by
-  the keys, DWSIM by the total stream, and that mismatch produced a 175% error
-  in the earlier ETJ comparison. The adapter converts recovery to BioSTEAM's
-  keys-only basis in one tested place.
-- **Task 9 must not leak BioSTEAM types across the `Simulator` protocol.** No
-  `Stream`, no `Unit`. That is what makes DWSIM a second file later rather than
-  a refactor.
+- **SETTLED IN TASK 9: `ColumnSpec` takes recoveries, and nothing converts
+  them.** BioSTEAM accepts recoveries natively —
+  `product_specification_format="Recovery"` with `Lr`/`Hr`, exactly the two
+  fields `ColumnSpec` carries — so the keys-only mole-fraction basis is never
+  built. The plan's conversion was measured correct before being deleted; both
+  routes give 0.99000. A DWSIM adapter must pass recoveries through its own
+  native route too, and must NOT reintroduce a mole-fraction basis.
+- **The tolerance on the basis test is load-bearing; do not relax it.** Reading
+  a recovery as a keys-only mole fraction moves methanol overhead from 99.0000
+  to 99.2020 kmol/hr — 0.002 in recovery. The plan asserted `abs=0.02`, forty
+  times too loose to see it, and a first rewrite at `abs=0.005` still let the
+  mutation pass. Recovery is exact by definition; `abs=5e-4` is deliberate.
+- **`Simulator` leaks no BioSTEAM types.** No `Stream`, no `Unit` crosses
+  `base.py`. That is what makes DWSIM a second file rather than a refactor.
 - **Task 12's ambiguity flag is the point of acceptance test 2**, not a nicety.
   The methanol/water/glycerol problem specifies only methanol purity; water and
   glycerol are never separated from each other. The tool must answer the literal
   question AND print that it did not separate them. Answering silently would be
   the failure the test exists to catch.
-- **BioSTEAM import costs ~70 s** and is not cached between processes. Task 9's
-  first test run will be slow. That is expected, not a hang.
+- **BioSTEAM imports in ~8 s, not ~70 s.** The earlier figure in this file was
+  wrong; measured at 8.4 s on this machine. The full 69-test suite runs in
+  about 9 s. If a run hangs, it is a hang, not the import.
 
 ## The pattern worth carrying forward
 
-Twelve fix rounds across seven reviewed tasks. **Every single one** was either a
-test that could not fail against the defect it named, or a value asserting
-knowledge it did not have. Not one was a wrong formula or a chemistry error.
+Twelve fix rounds across seven reviewed tasks, plus Task 8's review and two
+vacuous tests caught inside Task 9 before commit. **Every single one** was
+either a test that could not fail against the defect it named, or a value
+asserting knowledge it did not have. Not one was a wrong formula or a chemistry
+error. Task 9 added a third face of the same coin: **a tolerance wide enough to
+swallow the defect the test was written for.** Whenever a quantity is exact by
+construction — a recovery, a mass balance — assert it tightly, and set the
+tolerance from a measurement of the wrong answer rather than by habit.
 
 The check that caught most of them: take the fix out, confirm the test now
 fails, put it back. If the test still passes with the fix removed, it is not
