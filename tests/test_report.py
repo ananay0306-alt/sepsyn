@@ -51,3 +51,33 @@ def test_the_two_empty_alpha_cases_do_not_print_the_same_explanation():
         return next(ln for ln in text.splitlines() if ln.strip().startswith("alpha:"))
 
     assert alpha_line(single) != alpha_line(supercritical)
+
+
+def test_alphas_are_actually_listed_when_the_feed_has_them():
+    """The normal case, which the other tests here all skip.
+
+    Every other test in this file uses a feed with NO alphas -- one component,
+    or all supercritical -- so all of them pass against a report that never
+    prints an alpha line at all. Without this, breaking the alpha branch is
+    invisible: the code falls through to "not applicable" and the single-
+    component test is perfectly happy. Found by mutation, not by reading.
+    """
+    record, text = report_for("Methanol:100,Water:80", T_K=330.0)
+
+    assert record.alphas, "premise: this feed must produce alphas"
+    assert "alpha Methanol/Water" in text
+    assert "3.48" in text                       # measured 3.481 at 345.1 K
+    assert "bubble point at column P" in text   # the basis travels with the value
+    assert "not computed" not in text
+    assert "not applicable" not in text
+
+
+def test_every_alpha_printed_carries_its_conditions():
+    """A bare alpha is meaningless -- Alpha exists to keep T and P attached, so
+    the report must not drop them on the way out."""
+    record, text = report_for("Methanol:100,Water:80,Glycerol:25", T_K=330.0)
+
+    alpha_lines = [ln for ln in text.splitlines() if ln.strip().startswith("alpha ")]
+    assert len(alpha_lines) == len(record.alphas)
+    for line in alpha_lines:
+        assert " K," in line and "bar" in line, f"conditions missing: {line!r}"
