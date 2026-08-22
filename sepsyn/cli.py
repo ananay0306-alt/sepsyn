@@ -3,7 +3,7 @@ import argparse
 import sys
 
 from sepsyn.engine import evaluate, load_rules, overall_verdict
-from sepsyn.properties import build_property_record, resolve
+from sepsyn.properties import UnknownChemical, build_property_record, resolve
 from sepsyn.report import format_report
 from sepsyn.types import Component, Feed
 
@@ -106,7 +106,14 @@ def main(argv: list[str] | None = None) -> int:
                    help="light key mole fraction of the TOTAL bottoms")
     args = p.parse_args(argv)
 
-    feed = parse_feed(args.feed, args.T, args.P)
+    try:
+        feed = parse_feed(args.feed, args.T, args.P)
+    except (UnknownChemical, ValueError) as exc:
+        # resolve() already assembled near-match suggestions; a traceback is the
+        # one presentation that makes them read as a crash rather than an answer.
+        print(f"sepsyn: {exc}", file=sys.stderr)
+        return 2
+
     record, verdicts, overall = screen(feed)
     print(format_report(feed, record, verdicts, overall, explain=args.explain))
 
