@@ -24,14 +24,37 @@ def format_report(
         state = "SUPERCRITICAL" if feed.T_K > tc else "condensable"
         lines.append(f"  {c.name:<12}{tb:>10.1f}{tc:>10.1f}   {state}")
 
-    if record.min_alpha is None:
-        lines.append("  alpha: undefined -- no vapour-liquid equilibrium at these conditions")
-    else:
+    # Branch on WHY there are no alphas, not merely on the fact that there are
+    # none. `min_alpha is None` collapses four different causes into one flag:
+    # every component supercritical, a single-component feed with no pair to
+    # compare, the bubble-point solve raising, and every pair hitting the
+    # zero-fraction guard. Only the first of those means "no vapour-liquid
+    # equilibrium". Task 5 made the record able to tell these apart
+    # (n_supercritical_at_feed, feed_phase, tri-state has_azeotrope); printing a
+    # single sentence for all of them throws that distinction away again at the
+    # last step and states a reason the record does not support.
+    if record.alphas:
         for a in record.alphas:
             lines.append(
                 f"  alpha {a.pair[0]}/{a.pair[1]} = {a.value:.3f} "
                 f"at {a.T_K:.1f} K, {a.P_Pa/1e5:.3f} bar ({a.basis})"
             )
+    elif record.n_supercritical_at_feed == record.n_components:
+        lines.append(
+            "  alpha: not computed -- every component is above its critical "
+            "temperature at feed conditions, so no liquid phase exists"
+        )
+    elif record.n_components < 2:
+        lines.append(
+            "  alpha: not applicable -- relative volatility is a property of a "
+            "pair, and this feed has one component"
+        )
+    else:
+        lines.append(
+            "  alpha: not computed -- the bubble-point solve returned no usable "
+            "pair at these conditions (this is a gap in the evidence, not a "
+            "finding about the mixture)"
+        )
     lines.append("")
 
     fired = [v for v in verdicts if v.fired]
