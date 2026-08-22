@@ -1,7 +1,7 @@
 # sepsyn milestone 1 — handoff
 
-**Written 2026-08-22, after Task 8 passed acceptance test 1.**
-Branch `milestone-1`, 19 commits ahead of `main`, 55 tests passing.
+**Written 2026-08-22 after Task 8 passed acceptance test 1; updated the same
+day after Task 8's review.** Branch `milestone-1`, 58 tests passing.
 
 The full SDD ledger (13 rulings, 15 deferred minors) is copied alongside this
 file as `2026-08-22-sdd-ledger.md`. It originally lived in `.superpowers/`,
@@ -19,14 +19,13 @@ the workspace being cleaned.
 | 5 Alpha at bubble point | complete | 1 |
 | 6 Rule table + evaluator | complete | 1 |
 | 7 Evaluate all rules | complete | 1 |
-| 8 Report + CLI + **acceptance test 1** | **implemented, NOT yet reviewed** | — |
+| 8 Report + CLI + **acceptance test 1** | complete | 1 |
 | 9 Simulator protocol + BioSTEAM adapter | not started | |
 | 10 Pressure rule + reflux sweep | not started | |
 | 11 Verification | not started | |
 | 12 **Acceptance test 2** + ambiguity flag + negative test | not started | |
 
-**Immediate next action:** review Task 8 (BASE `02c49e8`, HEAD `83847b2`), then
-dispatch Task 9 with BASE = the reviewed head.
+**Immediate next action:** dispatch Task 9 with BASE `7823e9b`.
 
 ## What Task 8 settled
 
@@ -45,6 +44,11 @@ Two things in that output are load-bearing and were fixed earlier, so do not
 - **`min_alpha = None`** for a supercritical feed is why R-01 and R-02 cannot
   fire. `safe_eval` treats any comparison involving `None` as `False`, by
   design, so a missing property never fires a rule and never raises.
+  But do NOT read `min_alpha is None` as "there is no equilibrium": it also
+  means a one-component feed, a bubble-point solve that raised, or every pair
+  skipped by the zero-fraction guard. Task 8's review found `report.py` doing
+  exactly that. Branch on `n_supercritical_at_feed == n_components` when you
+  need the strong claim.
 
 ## Facts established by probing that are NOT obvious from the code
 

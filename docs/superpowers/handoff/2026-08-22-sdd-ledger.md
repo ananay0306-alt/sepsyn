@@ -306,3 +306,56 @@ Task 7: re-review round 1 — both findings ADDRESSED. as_namespace() genuinely
   'liquid'` validates only feed_phase. No new breakage.
 Task 7: complete (commits 50703f5..02c49e8, review clean after 1 fix round)
 Task 8: dispatched (sonnet, BASE 02c49e8) — report, CLI, ACCEPTANCE TEST 1
+Task 8: implementer DONE (commit 83847b2, 55 passed). Acceptance test 1 green:
+  H2/methane 298.15 K -> INFEASIBLE, R-04 only, PSA / membrane /
+  cryogenic_partial_condensation named, 8 non-firing rules still reported.
+Task 8: review (controller, BASE 02c49e8, HEAD 83847b2) — spec OK, quality
+  Changes needed (1 Important, 3 Minor).
+Task 8: Ruling: report.py must branch on WHY there are no alphas, not on the bare
+  fact that there are none. `if record.min_alpha is None` printed "no
+  vapour-liquid equilibrium at these conditions" for FOUR different causes:
+  (a) every component supercritical — the only case where that sentence is true;
+  (b) a single-component feed, where itertools.combinations(names, 2) yields no
+  pair at all; (c) bp.solve_Ty raising, caught by `except Exception: return ()`
+  in relative_volatilities; (d) every pair skipped by the min(...) <= 0 guard.
+  REPRODUCED, not inferred: `--feed "Methanol:100" --T 298.15` printed
+  "Methanol ... condensable", computed condensing_T = 337.6 K, and then declared
+  no vapour-liquid equilibrium — three lines of one report contradicting each
+  other. This is the Task 5 defect resurfacing one layer out. The RECORD was
+  fixed then (n_supercritical_at_feed, feed_phase, tri-state has_azeotrope all
+  distinguish these cases and were correct here); report.py collapsed the
+  distinction back at the presentation layer. A distinction defended in the data
+  model can still be discarded by the code that renders it.
+  Eleventh instance of "a value asserting knowledge it does not have".
+  Cost if wrong: three extra branches on a formatting path with no callers
+  besides the report.
+Task 8: coverage gap that allowed it: format_report had NO dedicated test. The
+  acceptance test is the only caller, and it exercises only case (a), where the
+  wrong sentence happens to be true. The false branch was never executed by any
+  test in the suite.
+Task 8: minor (deferred): `assert "not fired" in text` in the acceptance test
+  cannot fail — the header "RULES CONSIDERED AND not fired" is appended
+  unconditionally under explain=True, before the loop. Mutation-confirmed: with
+  the loop body dead the assertion still passes and the test fails one line later
+  on `assert "R-01" in text`. The test as a whole bites; that one assertion is
+  decorative. Left alone because the test is load-bearing via R-01.
+Task 8: minor (deferred): main() returns 0 unconditionally and lets
+  UnknownChemical escape as a raw traceback, so Task 2's suggestion machinery
+  never reaches a CLI user who misspells a name. Task 12 replaces cli.py below
+  screen() (conflict-scan row 5) — fold it in there.
+Task 8: minor (deferred): format_report recomputes resolve/Tb/Tc per component
+  and re-derives the supercritical test as `feed.T_K > tc`, duplicating
+  count_supercritical rather than reading the record. Agrees today because both
+  use `>` and the same lookup; a change to either drifts the report away from the
+  verdict it is printing.
+Task 8: fix round 1/5 (commit 7823e9b) — Important finding ADDRESSED by the
+  controller directly (no implementer dispatched). Four-way branch keyed on
+  record.alphas, then n_supercritical_at_feed == n_components, then
+  n_components < 2, else an explicit "gap in the evidence, not a finding about
+  the mixture". New tests/test_report.py — first dedicated coverage for report.py.
+  Mutation-verified: restoring the original branch from 83847b2 verbatim fails 2
+  of the 3 new tests; the third (supercritical still says "no liquid phase")
+  passes both ways by design, being a regression guard rather than a defect test.
+  58 passed. Acceptance test 1 output unchanged apart from the reworded alpha
+  line, which its assertions do not touch.
+Task 8: complete (commits 02c49e8..7823e9b, review clean after 1 fix round)
