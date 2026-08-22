@@ -16,6 +16,7 @@ from sepsyn.design import (
     SweepPoint,
     best_point,
     choose_pressure,
+    recoveries_for_purity,
     sweep_reflux,
 )
 from sepsyn.simulators.base import ColumnResult, ColumnSpec
@@ -202,3 +203,67 @@ def test_best_point_is_the_cheapest_annualised():
                    installed_cost_USD=600_000, utility_cost_USD_hr=30.0),
     ]
     assert best_point(pts).k == 1.3
+
+
+# --------------------------------------------------------------------------
+# purity targets -> recoveries
+# --------------------------------------------------------------------------
+
+def test_recoveries_for_purity_hits_the_stated_specification():
+    """The milestone's spec is written in TOTAL-stream mole fractions, but
+    ColumnSpec is written in recoveries -- deliberately, because recovery
+    survives a change of simulator and mole fraction does not. Something has to
+    convert between them, and it must be this function rather than a loose
+    tolerance on the acceptance test.
+
+    Measured: for methanol/water/glycerol at 100/80/25 the answer is
+    Lr = 0.989495, Hr = 0.987506, which delivers 0.99000 and 0.01000 exactly.
+    Passing 0.99/0.99 as recoveries instead -- what the plan did -- gives
+    0.99198 and 0.00951, a different specification that merely looks similar.
+    """
+    lr, hr = recoveries_for_purity(
+        Feed(components=(Component("Methanol", "67-56-1", 100.0),
+                         Component("Water", "7732-18-5", 80.0),
+                         Component("Glycerol", "56-81-5", 25.0)),
+             T_K=330.0, P_Pa=101325.0),
+        light_key="Methanol", heavy_key="Water",
+        distillate_purity=0.99, bottoms_impurity=0.01,
+    )
+    assert lr == pytest.approx(0.989495, abs=1e-5)
+    assert hr == pytest.approx(0.987506, abs=1e-5)
+
+
+def test_the_solved_recoveries_beat_the_naive_ones_where_it_counts():
+    """The recoveries differ from a naive 0.99 by only 0.0005, which is why
+    asserting on them proves little. The difference that matters is downstream:
+    run both through the simulator and compare the PURITY actually delivered.
+    """
+    feed = Feed(components=(Component("Methanol", "67-56-1", 100.0),
+                            Component("Water", "7732-18-5", 80.0),
+                            Component("Glycerol", "56-81-5", 25.0)),
+                T_K=330.0, P_Pa=101325.0)
+    sim = BioSteamSimulator()
+
+    def distillate_purity(lr, hr):
+        r = sim.design_column(feed, ColumnSpec("Methanol", "Water", lr, hr,
+                                               101325.0, 1.2))
+        assert r.converged, r.error
+        return r.distillate["Methanol"] / sum(r.distillate.values())
+
+    lr, hr = recoveries_for_purity(feed, "Methanol", "Water", 0.99, 0.01)
+    assert distillate_purity(lr, hr) == pytest.approx(0.99, abs=1e-5)
+    # the naive substitution misses the stated target by ~0.002
+    assert distillate_purity(0.99, 0.99) != pytest.approx(0.99, abs=1e-3)
+
+
+def test_recoveries_for_purity_reports_an_impossible_target_as_data():
+    """A purity that no split can reach must be refused, not silently clipped
+    into a recovery outside [0, 1] that the simulator would then reject with a
+    confusing error."""
+    feed = Feed(components=(Component("Methanol", "67-56-1", 1.0),
+                            Component("Water", "7732-18-5", 99.0)),
+                T_K=330.0, P_Pa=101325.0)
+    with pytest.raises(ValueError, match="cannot"):
+        recoveries_for_purity(feed, "Methanol", "Water",
+                              distillate_purity=0.999999,
+                              bottoms_impurity=0.999999)

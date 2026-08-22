@@ -27,6 +27,60 @@ def screen(feed: Feed):
     return record, verdicts, overall_verdict(verdicts)
 
 
+def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
+                       lk_recovery: float = 0.99, hk_recovery: float = 0.99,
+                       distillate_purity: float | None = None,
+                       bottoms_impurity: float | None = None):
+    """Design the column and report what the specification did NOT cover.
+
+    Recoveries may be given directly, or TOTAL-stream purities may be given and
+    converted. The conversion is explicit because the two are different
+    specifications: 99% recovery asks how much of the light key fed goes
+    overhead, 99 mol% purity asks how much of the overhead is light key.
+    Substituting one for the other misses the target by ~0.002 on the milestone
+    feed, which is the same magnitude as the basis error this project exists to
+    avoid.
+    """
+    from dataclasses import replace
+
+    from sepsyn.design import (best_point, choose_pressure, recoveries_for_purity,
+                               sweep_reflux)
+    from sepsyn.simulators.base import ColumnResult, ColumnSpec
+    from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
+    from sepsyn.verify import verify_column
+
+    if distillate_purity is not None or bottoms_impurity is not None:
+        if distillate_purity is None or bottoms_impurity is None:
+            raise ValueError(
+                "give both distillate_purity and bottoms_impurity, or neither"
+            )
+        lk_recovery, hk_recovery = recoveries_for_purity(
+            feed, light_key, heavy_key, distillate_purity, bottoms_impurity)
+
+    pressure, _note = choose_pressure(feed, light_key)
+    spec = ColumnSpec(light_key, heavy_key, lk_recovery, hk_recovery, pressure)
+    sim = BioSteamSimulator()
+
+    # Anything that is neither key has no specification constraining it.
+    unseparated = [n for n in feed.names if n not in (light_key, heavy_key)]
+
+    points = sweep_reflux(sim, feed, spec)
+    try:
+        best = best_point(points)
+    except ValueError:
+        # Every reflux failed. Return that as data, with the reasons, rather
+        # than raising -- the sweep is exactly where infeasibility shows up.
+        why = "; ".join(f"k={p.k}: {p.error}" for p in points if not p.converged)
+        failed = ColumnResult({}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, False,
+                              error=f"no reflux multiple produced a design. {why}")
+        return spec, points, None, failed, verify_column(feed, spec, failed), unseparated
+
+    spec = replace(spec, reflux_over_minimum=best.k)
+    result = sim.design_column(feed, spec)
+    checks = verify_column(feed, spec, result)
+    return spec, points, best, result, checks, unseparated
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         prog="sepsyn",
@@ -37,11 +91,44 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--P", type=float, default=101325.0, help="feed pressure, Pa")
     p.add_argument("--explain", action="store_true",
                    help="also print rules that did not fire, with their values")
+    p.add_argument("--design", action="store_true",
+                   help="design the column if screening says it is feasible")
+    p.add_argument("--light-key")
+    p.add_argument("--heavy-key")
+    p.add_argument("--lk-recovery", type=float, default=0.99,
+                   help="fraction of the light key fed that leaves overhead")
+    p.add_argument("--hk-recovery", type=float, default=0.99,
+                   help="fraction of the heavy key fed that leaves in the bottoms")
+    p.add_argument("--distillate-purity", type=float,
+                   help="light key mole fraction of the TOTAL distillate; "
+                        "converted to recoveries, use with --bottoms-impurity")
+    p.add_argument("--bottoms-impurity", type=float,
+                   help="light key mole fraction of the TOTAL bottoms")
     args = p.parse_args(argv)
 
     feed = parse_feed(args.feed, args.T, args.P)
     record, verdicts, overall = screen(feed)
     print(format_report(feed, record, verdicts, overall, explain=args.explain))
+
+    if args.design:
+        if overall not in ("feasible", "caution"):
+            print(f"\nNot designing: screening returned {overall.upper()}.")
+            return 0
+        if not (args.light_key and args.heavy_key):
+            print("\n--design requires --light-key and --heavy-key")
+            return 2
+        from sepsyn.report import format_design
+        try:
+            out = design_if_feasible(
+                feed, args.light_key, args.heavy_key,
+                args.lk_recovery, args.hk_recovery,
+                distillate_purity=args.distillate_purity,
+                bottoms_impurity=args.bottoms_impurity)
+        except ValueError as exc:
+            print(f"\nCannot design: {exc}")
+            return 2
+        print()
+        print(format_design(*out))
     return 0
 
 

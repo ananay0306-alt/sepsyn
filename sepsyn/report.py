@@ -86,3 +86,68 @@ def format_report(
             lines.append(f"        condition: {v.condition}")
             lines.append(f"        values:    {vals}")
     return "\n".join(lines)
+
+
+def format_design(spec, points, best, result, checks, unseparated) -> str:
+    """The design half of the report. Same contract as the screening half: show
+    the numbers that decided it, and say plainly what was not decided."""
+    lines: list[str] = []
+    lines.append("COLUMN DESIGN")
+    lines.append(f"  keys        {spec.light_key} (light) / {spec.heavy_key} (heavy)")
+    lines.append(f"  pressure    {spec.pressure_Pa/1e5:.3f} bar")
+    lines.append(f"  recovery    {spec.light_key} {spec.lk_recovery_to_distillate:.3%} "
+                 f"overhead, {spec.heavy_key} {spec.hk_recovery_to_bottoms:.3%} bottoms")
+    lines.append("")
+    lines.append("REFLUX SWEEP")
+    lines.append(f"  {'k':>6}{'stages':>9}{'annualised $/yr':>19}")
+    for p in points:
+        if not p.converged:
+            lines.append(f"  {p.k:>6.2f}{'--':>9}{'no design':>19}   {p.error or ''}")
+            continue
+        mark = "  <- cheapest" if best is not None and p is best else ""
+        lines.append(f"  {p.k:>6.2f}{p.stages:>9.0f}"
+                     f"{p.annualised_cost_USD_yr:>19,.0f}{mark}")
+    lines.append("")
+
+    if result.converged:
+        lines.append("PRODUCTS (kmol/hr)")
+        d_total = sum(result.distillate.values())
+        b_total = sum(result.bottoms.values())
+        for name in result.distillate:
+            d = result.distillate[name]
+            b = result.bottoms.get(name, 0.0)
+            lines.append(
+                f"  {name:<12}{d:>10.3f} overhead ({d/d_total:>7.3%})"
+                f"{b:>12.3f} bottoms ({b/b_total:>7.3%})" if d_total and b_total
+                else f"  {name:<12}{d:>10.3f} overhead{b:>12.3f} bottoms"
+            )
+        lines.append("")
+
+    lines.append("VERIFICATION")
+    for c in checks:
+        lines.append(f"  [{'PASS' if c.passed else 'FAIL'}]  {c.name:<22}{c.detail}")
+
+    if unseparated:
+        lines.append("")
+        lines.append("NOT SPECIFIED")
+        for n in unseparated:
+            d = result.distillate.get(n, 0.0)
+            b = result.bottoms.get(n, 0.0)
+            total = d + b
+            if total <= 0:
+                lines.append(f"  {n}: absent from both products.")
+                continue
+            # Report where it WENT, read off the result. The earlier draft of
+            # this note asserted "left together in the bottoms" without looking,
+            # which would be wrong for any volatile non-key.
+            stream, flow = (("bottoms", result.bottoms) if b >= d
+                            else ("overhead", result.distillate))
+            stream_total = sum(flow.values()) or 1.0
+            companions = sorted(m for m, v in flow.items()
+                                if m != n and v / stream_total > 0.01)
+            with_whom = ", ".join(companions) if companions else "anything else"
+            lines.append(f"  {n}: {100*max(d, b)/total:.1f}% to the {stream}, "
+                         f"where it was NOT separated from {with_whom}.")
+        lines.append("  No specification distinguishes these components, so the column")
+        lines.append("  was never asked to split them. Separate products need a second column.")
+    return "\n".join(lines)

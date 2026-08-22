@@ -141,3 +141,61 @@ def best_point(points: list[SweepPoint]) -> SweepPoint:
             f"no converged points in sweep ({len(points)} attempted)"
         )
     return min(converged, key=lambda p: p.annualised_cost_USD_yr)
+
+
+def recoveries_for_purity(feed: Feed, light_key: str, heavy_key: str,
+                          distillate_purity: float,
+                          bottoms_impurity: float) -> tuple[float, float]:
+    """Convert TOTAL-stream mole-fraction targets into key recoveries.
+
+    ColumnSpec is written in recoveries because recovery means the same thing
+    in every simulator. Real specifications are usually written in purities.
+    Something has to convert, and it belongs here -- named, tested, and in one
+    place -- rather than being smuggled in by passing a purity where a recovery
+    is expected and letting a loose tolerance hide the difference. Those are
+    genuinely different specifications: 99% recovery asks how much of the
+    methanol fed goes overhead, 99 mol% purity asks how much of the overhead is
+    methanol.
+
+    With L and H the light and heavy key feed rates and O the total of every
+    other component, and assuming the non-keys leave in the bottoms:
+
+        distillate purity  yD = L*Lr / (L*Lr + H*(1 - Hr))
+        bottoms impurity   xB = L*(1 - Lr) / (L*(1 - Lr) + H*Hr + O)
+
+    Two equations, two unknowns, solved exactly. The non-keys-to-bottoms
+    assumption is checked by the caller against the simulated result -- for
+    methanol/water/glycerol the glycerol split is 25.0000 to the bottoms and
+    0.000000 overhead, so it holds there. A non-key that is actually volatile
+    would break it, which is why the achieved purity is asserted afterwards
+    rather than assumed.
+
+    Raises ValueError if no physical pair of recoveries reaches the target.
+    """
+    flows = {c.name: c.flow_kmol_hr for c in feed.components}
+    L, H = flows[light_key], flows[heavy_key]
+    O = sum(v for n, v in flows.items() if n not in (light_key, heavy_key))
+
+    if not 0.0 < distillate_purity < 1.0 or not 0.0 < bottoms_impurity < 1.0:
+        raise ValueError(
+            "cannot solve: purities must be strictly between 0 and 1 "
+            f"(got distillate {distillate_purity}, bottoms {bottoms_impurity})"
+        )
+
+    a = distillate_purity * H / (L * (1.0 - distillate_purity))
+    denominator = L * (1.0 - bottoms_impurity) * a - bottoms_impurity * H
+    if denominator == 0:
+        raise ValueError("cannot solve for recoveries: degenerate specification")
+
+    v = (L * (1.0 - bottoms_impurity) - bottoms_impurity * (H + O)) / denominator
+    hk_recovery = 1.0 - v
+    lk_recovery = a * v
+
+    if not (0.0 < lk_recovery < 1.0 and 0.0 < hk_recovery < 1.0):
+        raise ValueError(
+            f"cannot reach distillate {distillate_purity:.4f} / bottoms "
+            f"{bottoms_impurity:.4f} on this feed: it would need "
+            f"{light_key} recovery {lk_recovery:.4f} and {heavy_key} recovery "
+            f"{hk_recovery:.4f}, and a recovery must lie between 0 and 1"
+        )
+    return lk_recovery, hk_recovery
