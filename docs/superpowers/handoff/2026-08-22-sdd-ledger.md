@@ -477,3 +477,56 @@ Task 10: MEASURED the cost curve before asserting on it. Annualised cost over
 Task 10: complete (commit cfedb0d, 80 passed). Mutation-verified: reinstating
   the default-pressure read fails 3 tests, the silent drop fails 1, removing
   best_point's converged filter fails 1.
+Task 11: NOT dispatched — controller implemented directly, probe first.
+Task 11: Ruling: RECOVERY_TOL 0.03 -> 1e-3. The plan's value could not detect
+  the defect the whole recovery spec exists to prevent. MEASURED both scales
+  before choosing: BioSTEAM hits a requested recovery to 1.1e-16 across 16
+  spec/reflux combinations (0.99/0.99, 0.95/0.95, 0.999/0.999, 0.90/0.999 x
+  k = 1.1/1.2/1.5/2.0) — recovery is IMPOSED, not iterated, so there is
+  essentially no numerical error to absorb — while the keys-only mole-fraction
+  misreading shifts recovery by 0.002 (Task 9). The plan's 0.03 was 15x above
+  the defect and 3e14x above the noise. Verification is the LAST line of
+  defence and its failures are reported as data, so a false alarm costs a
+  printed line while a miss certifies a wrong design. Favour tight.
+  Cost if wrong: a noisier future simulator trips the check and says by how
+  much, which is the behaviour wanted anyway.
+Task 11: Ruling: mass balance must be PER COMPONENT, not aggregate. An
+  aggregate total is not a balance — opposite-signed errors cancel.
+  DEMONSTRATED against the plan's own code before changing it: a result that
+  destroys 0.5 kmol/hr of glycerol and creates 1.0 of ethanol closes to 0.23%
+  overall, and both key recoveries are exactly 0.990, so EVERY planned check
+  passes on a design that transmutes matter. Now checks each component and
+  names the worst offender, since an unactionable failure is barely better than
+  no failure. Cost if wrong: none, strictly more checking.
+Task 11: MASS_BALANCE_TOL 0.01 -> 1e-3, but note the honest status: this one is
+  weaker than the recovery tolerance. There is no known defect signature at a
+  particular size, only the measured fact that BioSTEAM closes a component
+  balance to better than 1e-6. Pinned by a test using a 0.3% single-component
+  gap so the constant is at least load-bearing rather than decorative.
+Task 11: *** METHOD DEFECT IN THE CONTROLLER'S OWN MUTATION HARNESS ***
+  Mutations were being run without clearing __pycache__. `1e-3` and `0.01` are
+  both four characters, so the restored file had the SAME SIZE as the mutant,
+  and CPython's pyc validation (source mtime + size, at one-second granularity)
+  served the stale bytecode. The mutation never loaded. It reported as
+  "survived" — identical output to a mutation the tests caught — so the failure
+  mode points toward FALSE CONFIDENCE. Caught only because a test failed while
+  grep showed the correct constant in the source: imported value 0.01, file
+  said 1e-3.
+  Harness rebuilt: asserts the edit actually changed the file (cmp), clears
+  every __pycache__ before and after, runs python -B, and flags same-size edits
+  explicitly.
+  ALL EARLIER MUTATIONS RE-RUN CLEAN. Tasks 9 and 10: all six CAUGHT, including
+  T9-C ("!= 2" -> "> 99"), itself a same-size edit whose original result was
+  therefore unproven. Task 8: one NEW gap found — see below.
+Task 11: gap found in Task 8's own tests by the re-run. Disabling report.py's
+  alpha branch (`if record.alphas:` -> `if False:`) SURVIVED: every test in
+  test_report.py used a feed with NO alphas (one component, or all
+  supercritical), so all of them pass against a report that never prints an
+  alpha line. The tests proved the four empty-alpha causes are distinguished
+  but never proved the normal case works. Added two tests: alphas are listed
+  for a condensable multi-component feed (Methanol/Water, alpha 3.481 at
+  345.1 K, measured), and every printed alpha carries its T and P — the reason
+  the Alpha type exists. Mutation now caught.
+Task 11: complete (commit 89ba49d, 92 passed). Mutation-verified with clean
+  caches: RECOVERY_TOL -> 0.03 fails 1, MASS_BALANCE_TOL -> 0.01 fails 1,
+  aggregate balance fails 3, running checks past a non-converged result fails 1.

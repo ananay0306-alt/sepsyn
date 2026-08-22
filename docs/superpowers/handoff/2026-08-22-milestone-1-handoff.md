@@ -1,8 +1,7 @@
 # sepsyn milestone 1 — handoff
 
 **Written 2026-08-22 after Task 8 passed acceptance test 1; updated the same
-day after Task 8's review, Task 9 and Task 10.** Branch `milestone-1`, 80 tests
-passing.
+day after Task 8's review and Tasks 9-11.** Branch `milestone-1`, 92 tests passing.
 
 The full SDD ledger (13 rulings, 15 deferred minors) is copied alongside this
 file as `2026-08-22-sdd-ledger.md`. It originally lived in `.superpowers/`,
@@ -23,10 +22,11 @@ the workspace being cleaned.
 | 8 Report + CLI + **acceptance test 1** | complete | 1 |
 | 9 Simulator protocol + BioSTEAM adapter | complete | 0 |
 | 10 Pressure rule + reflux sweep | complete | 0 |
-| 11 Verification | not started | |
+| 11 Verification | complete | 0 |
 | 12 **Acceptance test 2** + ambiguity flag + negative test | not started | |
 
-**Immediate next action:** Task 11 (verification of a design) with BASE `cfedb0d`.
+**Immediate next action:** Task 12 — acceptance test 2, the ambiguity flag and
+the negative test — with BASE `89ba49d`. This is the milestone.
 
 ## What Task 8 settled
 
@@ -101,6 +101,19 @@ These cost real time to discover. Anyone continuing should not re-derive them.
   `converged=False` and an error, mirroring `ColumnResult`. Do not "tidy" them
   out — the unbuildable region borders minimum reflux and is the interesting
   part. `best_point` filters them.
+- **Clear `__pycache__` before every mutation run.** The harness silently
+  reused stale bytecode: `1e-3` and `0.01` are both four characters, so a
+  restored file matched the mutant's size and CPython's pyc check (source mtime
+  + size, one-second granularity) served the old bytecode. The mutation never
+  loaded and reported as *survived* — the same output as a mutation the tests
+  caught, so it fails toward false confidence. Use
+  `scratchpad/mutate.sh`-style handling: assert the edit changed the file, wipe
+  every `__pycache__`, run `python -B`, and flag same-size edits.
+- **`verify.py`'s two tolerances are set from measurements. Do not round them
+  off.** `RECOVERY_TOL = 1e-3` sits between the 0.002 wrong-basis signature and
+  BioSTEAM's 1.1e-16 actual error. `MASS_BALANCE_TOL = 1e-3` is the weaker of
+  the two — no known defect signature, just measured 1e-6 closure — and is
+  pinned by a 0.3% single-component test.
 - **Task 12's ambiguity flag is the point of acceptance test 2**, not a nicety.
   The methanol/water/glycerol problem specifies only methanol purity; water and
   glycerol are never separated from each other. The tool must answer the literal
