@@ -6,8 +6,9 @@ unchanged as the record of what was believed on 2026-08-22 and as the evidence
 log for why it changed — its probe findings and its three appendices are still
 the source material and are not repeated here.
 
-**A ruling is requested before this is planned into tasks.** See "The ruling"
-below. Everything else follows from it.
+**RULED 2026-08-27: scope A.** The user chose the minimal scope. Scope B (the
+simulation direction) is deferred to its own milestone and is NOT part of
+milestone 2.
 
 ## Why the 08-22 scope was replaced
 
@@ -50,7 +51,7 @@ it means the shortcut is 10 % off the rigorous answer on that case.
 
 ## The ruling
 
-Two scopes are possible. **Recommendation: A.**
+Two scopes were possible. **Recommendation was A; A was ruled on 2026-08-27.**
 
 **A — minimal (recommended).** Keep the design direction and recoveries. Add
 duties as the comparison target and configuration assertions to the harness.
