@@ -73,11 +73,12 @@ Measured, not assumed:
    procedure documented; (c) both — fixtures for a hermetic suite, a live
    adapter behind an opt-in marker. Note that (b) validates the NUMBERS but
    proves nothing about the protocol, and the protocol is claim 2 above.
-2. **Configuring `ShortcutColumn` is an open question.** The obvious property
-   names are rejected and reflection does not surface the spec fields. Resolve
-   this BEFORE planning tasks; if it cannot be resolved, the rigorous
-   `DistillationColumn` with a "Component Recovery" spec is the fallback, at
-   the cost of no longer comparing like-for-like shortcut methods.
+2. ~~**Configuring `ShortcutColumn` is an open question.**~~ **RESOLVED
+   2026-08-27 — see "Risk 2 resolved" below.** The spec fields are public
+   FIELDS, not properties, which is why the property setter rejected them and
+   `get_object` never showed them. A working configuration path exists. But it
+   forces a mole-fraction basis, which changes the plan — read that section
+   before planning tasks.
 3. **Matching thermo is a precondition, not a detail.** Both sides must run
    Modified UNIFAC (Dortmund). An unmatched package turns every disagreement
    into a property-package artefact and the milestone answers nothing.
@@ -109,3 +110,98 @@ Milestone 2 is complete when:
 - A deliberate basis mismatch between the two is caught by the harness.
 - Matched property packages are asserted by the harness, not assumed by the
   operator.
+
+
+## Risk 2 resolved (2026-08-27)
+
+Probed live through `dwsim-mcp`. The server itself was not modified.
+
+### Why the property setter failed
+
+`ShortcutColumn`'s specification inputs are **public fields, not properties**.
+`set_object_property` reflects over properties and `get_object` dumps public
+scalar properties, so both were looking in the wrong place. A full reflection
+dump over `BindingFlags.Public|NonPublic|Instance` found them immediately.
+
+| field | type | role |
+|---|---|---|
+| `m_lightkey`, `m_heavykey` | String | key selection, by compound name |
+| `m_lightkeymolarfrac` | Double | **light key mole fraction in the BOTTOMS** |
+| `m_heavykeymolarfrac` | Double | **heavy key mole fraction in the DISTILLATE** |
+| `m_refluxratio` | Double | reflux ratio |
+| `m_condenserpressure`, `m_boilerpressure` | Double | Pa |
+| `condtype` | CondenserType | `TotalCond` by default |
+| `m_N`, `m_Nmin`, `m_Rmin`, `m_Qc`, `m_Qb` | Double | **outputs**, populated after solve |
+
+Ports are ordinary, so `connect_objects` works and `connect_column_stream` is
+not needed: inlet 0 = feed, inlet 1 = reboiler duty, outlet 0 = distillate,
+outlet 1 = bottoms, plus a separate condenser-duty energy port.
+
+Both fraction bases were **confirmed empirically**, not assumed: values were
+back-computed from BioSTEAM's recorded answer, and the solve reproduced it.
+
+### The finding that changes the plan
+
+**`ShortcutColumn` has no recovery spec.** The reflection dump is exhaustive
+and contains no recovery field of any kind — only the two mole fractions. The
+probe finding recorded above, that `configure_column` accepts "Component
+Recovery", applies to the **rigorous** `DistillationColumn`, not to
+`ShortcutColumn`.
+
+That collides with two decisions already made:
+
+- Task 9 chose recoveries specifically so no mole-fraction basis is ever
+  constructed. `ShortcutColumn` cannot honour that choice.
+- Comparing like-for-like shortcut methods requires `ShortcutColumn`.
+
+So the milestone must pick one, and the choice is now explicit rather than
+implicit:
+
+| option | keeps like-for-like FUG | avoids the basis conversion |
+|---|---|---|
+| `ShortcutColumn` | yes | **no** — forces a mole-fraction basis |
+| rigorous `DistillationColumn` + Component Recovery | no | yes |
+
+The mole-fraction basis is the exact error class that produced a 175 %
+discrepancy on the ETJ/SAF comparison, so choosing `ShortcutColumn` means
+deliberately re-entering it with a conversion that must itself be tested.
+
+### What the acceptance case actually proved, and what it did not
+
+Methanol / water / glycerol at 100 / 80 / 25 kmol/hr, 320 K, 1.013 bar,
+Modified UNIFAC (Dortmund) on both sides, R = 0.827.
+
+Per-component agreement, kmol/hr:
+
+| component | DWSIM dist | BioSTEAM dist | DWSIM btms | BioSTEAM btms |
+|---|---|---|---|---|
+| Methanol | 98.948 | 98.949 | 1.051 | 1.051 |
+| Water | 0.999 | 0.999 | 79.001 | 79.001 |
+| Glycerol | 0.000 | 0.000 | 25.000 | 25.000 |
+
+**This agreement must not be read as thermodynamic agreement.** The water mole
+fraction in the distillate comes back as 0.009995 and the methanol fraction in
+the bottoms as 0.010005 — each equal to its specification to six decimals.
+Both products are therefore IMPOSED by the specs, not predicted. What the match
+confirms is that the BASIS was read correctly; nothing more.
+
+The quantities that are actually predicted disagree:
+
+| quantity | DWSIM | BioSTEAM | gap |
+|---|---|---|---|
+| minimum reflux | 0.785 | 0.689 | 14 % |
+| stages | 25.3 | 44 | 43 % |
+
+**Both gaps are unexplained and need investigation.** No cause is asserted
+here. Candidates not yet tested: a different Underwood root selection, a
+different treatment of the third component in a pseudo-binary shortcut, or
+BioSTEAM reporting actual rather than theoretical stages. `m_Tc` and `m_Tb`
+also return 0 after a converged solve and may simply not be populated by this
+unit.
+
+This is the real cross-validation surface. A harness that compares only product
+flows on an imposed spec would report perfect agreement and detect none of it —
+which is the same "test that cannot fail" shape this project has caught before.
+
+Probe flowsheet saved at `sepsyn_m2_shortcut_probe.dwxmz` in the parent
+directory, editable in the DWSIM GUI.
