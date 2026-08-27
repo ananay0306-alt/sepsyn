@@ -192,12 +192,9 @@ The quantities that are actually predicted disagree:
 | minimum reflux | 0.785 | 0.689 | 14 % |
 | stages | 25.3 | 44 | 43 % |
 
-**Both gaps are unexplained and need investigation.** No cause is asserted
-here. Candidates not yet tested: a different Underwood root selection, a
-different treatment of the third component in a pseudo-binary shortcut, or
-BioSTEAM reporting actual rather than theoretical stages. `m_Tc` and `m_Tb`
-also return 0 after a converged solve and may simply not be populated by this
-unit.
+**Both gaps were investigated the same day. See "The gaps, explained" below.**
+`m_Tc` and `m_Tb` return 0 after a converged solve and may simply not be
+populated by this unit; not chased.
 
 This is the real cross-validation surface. A harness that compares only product
 flows on an imposed spec would report perfect agreement and detect none of it —
@@ -205,3 +202,85 @@ which is the same "test that cannot fail" shape this project has caught before.
 
 Probe flowsheet saved at `sepsyn_m2_shortcut_probe.dwxmz` in the parent
 directory, editable in the DWSIM GUI.
+
+
+## The gaps, explained (2026-08-27)
+
+Each step below was a test, not an inference. The order matters: the first
+finding removed most of the apparent disagreement, and only then was the real
+one visible.
+
+### 1. The 43 % stage gap was mostly a definition, not a disagreement
+
+`biosteam_adapter.py` line 76 reads `design_results["Actual stages"]`. DWSIM's
+`m_N` is THEORETICAL. BioSTEAM reports both:
+
+| | value |
+|---|---|
+| BioSTEAM actual stages | 43.0 |
+| BioSTEAM theoretical stages | 21 |
+| DWSIM `m_N` (theoretical) | 25.26 |
+
+Comparing like with like drops the gap from 43 % to **16.9 %**. The implied
+tray efficiency, 21/43 = 0.49, is the whole of the rest.
+
+**Consequence for the harness: it must compare theoretical stages to
+theoretical stages.** A harness fed `ColumnResult.stages` compares an actual
+stage count against a theoretical one and reports a ~40 % disagreement that
+does not exist. `ColumnResult` currently carries only `stages`, sourced from
+"Actual stages", so it cannot express this comparison at all.
+
+### 2. The remaining stage gap is a consequence of Rmin, not independent
+
+Re-solving DWSIM at R = 1.20 x its OWN Rmin (0.9423) rather than at BioSTEAM's
+absolute reflux gives `m_N` = 19.63 against BioSTEAM's 21 — **6.5 %**. Setting
+each column the same distance above its own minimum collapses the stage gap, so
+stages are not a second independent disagreement. There is one root: Rmin.
+
+### 3. The Rmin disagreement is real, and the acceptance case understates it
+
+Removing glycerol and re-running both sides:
+
+| case | DWSIM | BioSTEAM | DWSIM vs BioSTEAM |
+|---|---|---|---|
+| ternary (with glycerol) | 0.7853 | 0.6813 | **+15.3 %** |
+| binary (no glycerol) | 0.5164 | 0.6822 | **-24.3 %** |
+
+| effect of removing glycerol | |
+|---|---|
+| DWSIM | 0.7853 -> 0.5164, **-34.2 %** — strongly affected |
+| BioSTEAM | 0.6813 -> 0.6822, **+0.1 %** — essentially unaffected |
+
+Two distinct effects, established by differential experiment on both sides:
+
+1. **The two treat a heavy non-key completely differently.** Glycerol moves
+   DWSIM's Rmin by a third and BioSTEAM's not at all. BioSTEAM's
+   `BinaryDistillation` evidently drops a non-distributing heavy out of the
+   Underwood calculation; DWSIM's `ShortcutColumn` keeps it in.
+2. **They also disagree by 24 % on the pure binary**, where no third component
+   is involved at all. Cause unknown — **this one remains unexplained** and no
+   attribution is offered.
+
+**The two effects act in OPPOSITE directions and partially cancel.** The
+acceptance case shows a 15.3 % gap; the underlying method disagreement is
+larger than that in both components. A tolerance measured only on
+methanol/water/glycerol would be calibrated on a coincidence.
+
+This is the direct answer to Risk 4 ("agreement tolerance must be measured, not
+chosen"): **measure it on at least the binary case as well**, or the number
+will be set from two errors cancelling.
+
+Caveat on method: the DWSIM binary case was produced by setting glycerol's
+molar flow to 0 while leaving the compound in the flowsheet, not by removing
+the compound. A zero mole fraction should contribute nothing to an Underwood
+summation, but this was not separately verified.
+
+### What this means for the route decision
+
+Point 1 under Risk 2 (recoveries vs like-for-like FUG) is now easier to settle.
+"Like-for-like shortcut method" was the argument for accepting a mole-fraction
+basis with `ShortcutColumn`. But the two shortcut implementations disagree by
+24 % on minimum reflux for a plain binary, and handle non-keys on different
+principles. They are not like-for-like in any sense that would let a
+disagreement be attributed to thermodynamics. The argument for paying the
+basis-conversion risk is correspondingly weaker.
