@@ -1,6 +1,12 @@
 # sepsyn milestone 2 — DWSIM cross-validation
 
-**Status: draft spec, not yet planned into tasks.**
+> **SUPERSEDED 2026-08-27.** The SCOPE below was invalidated by the probe
+> findings in this document's own appendices. Plan from
+> `2026-08-27-milestone-2-revised.md` instead. This document is kept as the
+> record of what was believed on 2026-08-22, and its appendices remain the
+> evidence log — they are not repeated in the revision.
+
+**Status: superseded; kept as the record and the evidence log.**
 Written 2026-08-22, immediately after milestone 1 merged. Feasibility probed
 before writing; findings in "What the probe established" below.
 
