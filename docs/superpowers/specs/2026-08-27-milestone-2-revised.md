@@ -118,10 +118,9 @@ Established live on 2026-08-27, so these are not risks:
    versioned into the repo, (c) both. Note that (b) validates numbers but
    proves nothing about the protocol, which is half the milestone. **This is
    the first thing to decide when planning tasks.**
-2. **"Component Recovery" on the rigorous column is configured but not yet
-   exercised.** The spec type is accepted; a converged rigorous solve driven by
-   recoveries has not been run. Probe this BEFORE planning tasks, as was done
-   for `ShortcutColumn`.
+2. ~~**"Component Recovery" on the rigorous column is not yet exercised.**~~
+   **PROBED 2026-08-27 — the risk was mis-stated. See "Risk 5" below, which
+   replaces it and is more serious.**
 3. **The tolerance cannot be inherited from today's numbers.** The 6.3 %
    condenser / 1.9 % reboiler agreement measured on 08-27 was DWSIM's
    `ShortcutColumn` against BioSTEAM's shortcut. Moving DWSIM to a rigorous
@@ -161,3 +160,63 @@ Milestone 2 (A) is complete when:
 - A deliberate configuration mismatch is caught by the harness.
 - **No success criterion is satisfied by an imposed quantity.** Key recoveries
   may be checked, but may not be the evidence of agreement.
+
+
+## Risk 5 — the rigorous reference does not solve this acceptance case
+### (probed 2026-08-27; replaces the old Risk 2)
+
+**Seven configurations were run. None converged.** No numbers from any of them
+are reported or used anywhere.
+
+| # | configuration | result |
+|---|---|---|
+| 1 | ternary, 2x Component Recovery, 21 stages, Napthali-Sandholm | max iterations |
+| 2 | ternary, 2x Component Recovery, 30 stages, 300 iter | max iterations |
+| 3 | ternary, Reflux 0.8175 + Product Flow, 30 stages, N-S | timeout |
+| 4 | binary, Reflux 0.8175 + Product Flow, 30 stages, N-S | timeout |
+| 5 | binary, same but **NRTL** instead of UNIFAC-Dortmund | timeout |
+| 6 | binary, **Reflux 2.0**, 20 stages, **Wang-Henke**, 200 iter | mass balance 2.57e-4 vs 1e-4 tol |
+| 7 | binary, Reflux 2.0, 20 stages, Wang-Henke, 1000 iter | still running past 10 min |
+
+**What this rules OUT, by differential test:**
+
+- **Not the Component Recovery spec type.** Runs 3-7 use Reflux Ratio and
+  Product Molar Flow Rate — the two spec types that solved a 15-stage
+  benzene/toluene column in SECONDS the same day. They fail here too. The old
+  Risk 2 asked the wrong question.
+- **Not glycerol.** Run 4 (binary) is no better than run 3 (ternary).
+- **Not the property package.** Run 5 swaps Modified UNIFAC (Dortmund) for
+  NRTL and is equally slow, so the cost is not group-contribution activity
+  coefficients.
+
+**What it points AT:**
+
+- **The reflux derived from a shortcut is too low for the rigorous column.**
+  Raising reflux from 0.8175 (a value taken from shortcut Rmin of 0.52-0.68) to
+  2.0 changed the failure mode qualitatively — from an uninformative timeout to
+  a near-miss, mass balance off by 2.57e-4 against a 1e-4 tolerance. That is
+  the single most informative result of the seven.
+- **Napthali-Sandholm is dramatically more expensive than Wang-Henke here**
+  (~945 s vs ~120 s on comparable settings), which inverts the usual advice in
+  `AGENTS.md` for this system.
+- Even Wang-Henke at 1000 iterations does not finish inside ~10 minutes.
+
+### Consequences for scope A
+
+1. **The acceptance case may be the wrong case.** Methanol / water / glycerol
+   was chosen when BOTH sides were shortcut methods, where it is trivial. As a
+   rigorous reference it is a stiff, strongly non-ideal problem. The
+   benzene/toluene system solved rigorously in seconds the same day, and is the
+   obvious candidate for harness bring-up, with methanol/water kept as a later
+   stress case.
+2. **Solve times of minutes-to-timeout make a LIVE adapter impractical in a
+   test suite.** This pushes Risk 1 (transport) hard toward option (b),
+   recorded fixtures, or (c) with the live path behind an opt-in marker. Risk 2
+   has effectively decided Risk 1, which is not how the spec expected it to go.
+3. **The reference column cannot be driven by shortcut-derived reflux.** If the
+   harness compares a shortcut design against a rigorous reference, it must
+   solve the reference at a reflux the RIGOROUS column can achieve, and that
+   value is not known in advance from FUG.
+
+**None of this is resolved.** It is recorded so that task planning starts from
+it rather than rediscovering it.
