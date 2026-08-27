@@ -81,3 +81,39 @@ def test_every_alpha_printed_carries_its_conditions():
     assert len(alpha_lines) == len(record.alphas)
     for line in alpha_lines:
         assert " K," in line and "bar" in line, f"conditions missing: {line!r}"
+
+
+# --- requires / limitations in the output ------------------------------------
+
+
+def _verdict(**kw):
+    from sepsyn.engine import Verdict
+    base = dict(rule_id="R-99", rule_name="partial condensation may recover a liquid",
+                condition="feed_phase == 'vapor'", values={"feed_phase": "vapor"},
+                verdict="undetermined", technologies=("flash",),
+                because="cheap cooling may condense enough to matter",
+                fired=True, requires=("vapour fraction from a flash at 313.15 K",),
+                limitations="worthless when the vapour fraction stays near 1")
+    base.update(kw)
+    return Verdict(**base)
+
+
+def test_report_prints_the_calculation_a_fired_rule_still_requires():
+    """A named calculation that never reaches the page cannot be acted on, and
+    the verdict then looks like an ordinary refusal to decide."""
+    feed = parse_feed("Methanol:100", T_K=298.15, P_Pa=101325.0)
+    record, _, _ = screen(feed)
+    text = format_report(feed, record, [_verdict()], "undetermined")
+
+    assert "vapour fraction from a flash at 313.15 K" in text
+    assert "worthless when the vapour fraction stays near 1" in text
+
+
+def test_report_does_not_print_a_requires_block_for_a_rule_that_did_not_fire():
+    """Printing the calculation for every loaded rule would bury the one that
+    is actually outstanding."""
+    feed = parse_feed("Methanol:100", T_K=298.15, P_Pa=101325.0)
+    record, _, _ = screen(feed)
+    text = format_report(feed, record, [_verdict(fired=False)], "unknown")
+
+    assert "vapour fraction from a flash at 313.15 K" not in text

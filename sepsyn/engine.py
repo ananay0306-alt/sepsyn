@@ -32,6 +32,14 @@ class Rule:
     technologies: tuple[str, ...]
     because: str
     cite: str = ""
+    requires: tuple[str, ...] = ()
+    """Calculations that must be performed before this rule's verdict can be
+    acted on. A rule may fire on the properties it HAS while naming the ones it
+    still NEEDS -- without this field every rule is terminal, and a heuristic
+    that merely nominates a candidate becomes indistinguishable from one that
+    settles the question."""
+    limitations: str = ""
+    """Competing effects a reader must check before trusting the verdict."""
 
 
 @dataclass(frozen=True)
@@ -44,6 +52,8 @@ class Verdict:
     technologies: tuple[str, ...]
     because: str
     fired: bool
+    requires: tuple[str, ...] = ()
+    limitations: str = ""
 
 
 def safe_eval(expr: str, namespace: dict[str, Any]) -> bool:
@@ -97,7 +107,15 @@ def safe_eval(expr: str, namespace: dict[str, Any]) -> bool:
     return bool(_eval(tree))
 
 
-_VERDICT_RANK = {"infeasible": 3, "caution": 2, "feasible": 1}
+# Worst verdict wins, so this ordering IS the conflict-resolution policy.
+#
+# `undetermined` sits above `caution` and below `infeasible` deliberately.
+# Above caution: a rule that declined to conclude has not been answered by a
+# rule that merely counselled care, and reporting CAUTION would imply the tool
+# had weighed something it has not yet computed. Below infeasible: a hard
+# physical block is knowledge, whereas undetermined is the absence of it -- no
+# pending calculation can give a liquid phase to a feed that has none.
+_VERDICT_RANK = {"infeasible": 4, "undetermined": 3, "caution": 2, "feasible": 1}
 
 
 def _names_in(expr: str) -> list[str]:
@@ -126,6 +144,8 @@ def load_rules(path: str | None = None) -> list[Rule]:
             technologies=tuple(r["technologies"]),
             because=" ".join(r["because"].split()),
             cite=r.get("cite", ""),
+            requires=tuple(r.get("requires", ()) or ()),
+            limitations=" ".join((r.get("limitations", "") or "").split()),
         )
         for r in raw
     ]
@@ -160,6 +180,20 @@ def load_rules(path: str | None = None) -> list[Rule]:
                 f"{sorted(_VERDICT_RANK)}. An unrecognised verdict loads and "
                 f"fires, then crashes the ranking."
             )
+        for item in r.requires:
+            if not item.strip():
+                raise ValueError(
+                    f"rule {r.id} has an empty entry in requires. A blank "
+                    f"string satisfies the 'declares a calculation' check "
+                    f"while naming no calculation."
+                )
+        if r.verdict == "undetermined" and not r.requires:
+            raise ValueError(
+                f"rule {r.id} has verdict 'undetermined' but must declare at "
+                f"least one entry in requires. An undetermined verdict that "
+                f"names no calculation withholds an answer and gives the "
+                f"reader no way to obtain one."
+            )
 
     return sorted(rules, key=lambda r: (r.priority, r.id))
 
@@ -180,6 +214,7 @@ def evaluate(rules: list[Rule], record: PropertyRecord) -> list[Verdict]:
             rule_id=rule.id, rule_name=rule.name, condition=rule.when,
             values=used, verdict=rule.verdict,
             technologies=rule.technologies, because=rule.because, fired=fired,
+            requires=rule.requires, limitations=rule.limitations,
         ))
     return out
 
