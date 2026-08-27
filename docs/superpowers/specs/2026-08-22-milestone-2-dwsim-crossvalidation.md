@@ -284,3 +284,80 @@ basis with `ShortcutColumn`. But the two shortcut implementations disagree by
 principles. They are not like-for-like in any sense that would let a
 disagreement be attributed to thermodynamics. The argument for paying the
 basis-conversion risk is correspondingly weaker.
+
+
+## What the harness should actually compare (2026-08-27)
+
+### The acceptance criterion as written is close to a test that cannot fail
+
+Success criterion 2 asks that the two simulators "agree per component" on the
+methanol/water/glycerol column. But both are given the same RECOVERIES, and the
+probe showed the products coming back equal to their specs to six decimals.
+Per-component product agreement is therefore imposed by construction, not
+predicted.
+
+Count the unimposed numbers in that acceptance case: recoveries fix methanol
+and water, leaving exactly ONE free quantity — where glycerol goes. Its
+relative volatility against the keys is ~1e4, so every non-broken simulator
+sends it to the bottoms. On a pure BINARY case the count would be zero.
+
+This is caused by a good decision. Task 9 chose recoveries because they mean
+the same thing in every simulator — which is precisely what makes them useless
+as a comparison target. **Unambiguous and informative are in tension**, and
+the spec did not notice.
+
+### Duties are the cheap fix, and they immediately earned their keep
+
+`Qc` and `Qb` are predicted, not imposed, and both simulators report them.
+Adding them as a comparison target surfaced a configuration mismatch within
+minutes:
+
+| BioSTEAM setting | Qc kW | Qr kW |
+|---|---|---|
+| `partial_condenser=True` (the DEFAULT) | 804.8 | 2113.7 |
+| `partial_condenser=False` | 1783.9 | 2111.2 |
+| DWSIM, `condtype=TotalCond` | 1903.3 | 2070.9 |
+
+`BinaryDistillation` defaults to a PARTIAL condenser; the adapter never sets it
+and DWSIM was configured total. That single mismatch showed up as a 57.7 %
+condenser disagreement. Corrected, the two agree to **6.3 % on the condenser
+and 1.9 % on the reboiler**.
+
+### The pattern across every gap found today
+
+| apparent gap | true cause | after correction |
+|---|---|---|
+| stages, 43 % | actual vs theoretical stage basis | 16.9 % |
+| stages, 16.9 % | compared at absolute reflux, not matched R/Rmin | 6.5 % |
+| condenser duty, 57.7 % | partial vs total condenser | 6.3 % |
+| Rmin, 24 % (binary) | **unexplained** | — |
+
+Every large disagreement but one was a configuration or definition mismatch,
+not physics. Once matched, everything lands in the 2-7 % band.
+
+**Consequence for the harness: it must ASSERT configuration equivalence, not
+just compare numbers.** The spec already requires this for the property
+package. Extend it to condenser type, stage basis (theoretical vs actual) and
+reflux basis (absolute vs R/Rmin). A harness that compares numbers without
+asserting these will report large disagreements that are entirely its own
+fault — and, worse, may report agreement when two mismatches cancel, which is
+exactly what the ternary Rmin case does.
+
+### The simulation direction is available on both sides
+
+Checked, not assumed. BioSTEAM 2.53.11 exposes `MESHDistillation`,
+`RigorousDistillation`, `AdiabaticMultiStageVLEColumn` and `Absorber` /
+`Stripper`, all on `MultiStageEquilibrium`. `MESHDistillation.__init__` takes
+`N_stages`, `feed_stages`, `reflux`, `boilup`, `P` — the simulation direction,
+and the same configuration DWSIM's rigorous `DistillationColumn` takes.
+
+That makes a genuinely like-for-like rigorous comparison possible: two
+stage-by-stage MESH solvers, same column, nothing imposed, purities predicted
+on both sides. It is a better cross-validation than shortcut-vs-shortcut turned
+out to be, since the two shortcut implementations disagree on Underwood by 24 %
+on a binary and handle non-keys on different principles.
+
+`ColumnResult` cannot express a simulation-direction result today — it carries
+`stages` as an output, not an input. That is a `base.py` change, and per the
+milestone's own terms a required change to `base.py` is a headline result to be
+recorded rather than quietly accommodated.
