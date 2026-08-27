@@ -65,6 +65,12 @@ def format_report(
         lines.append(f"  {v.rule_id}  {v.rule_name}")
         vals = ", ".join(f"{k} = {val}" for k, val in v.values.items())
         lines.append(f"        {vals}")
+        # Only for rules that FIRED. Printing the outstanding calculation for
+        # every loaded rule would bury the one actually blocking a decision.
+        for req in v.requires:
+            lines.append(f"        REQUIRES  {req}")
+        if v.limitations:
+            lines.append(f"        CAVEAT    {v.limitations}")
     lines.append("")
 
     lines.append(f"VERDICT  distillation {overall.upper()}")

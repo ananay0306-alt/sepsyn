@@ -62,6 +62,17 @@
     some components cannot be condensed at feed conditions; a partial
     condensation or cryogenic step is needed before any column
   cite: "Kohl & Nielsen, Gas Purification"
+  requires:
+    - >-
+      vapour fraction remaining after cooling to the cooling-water limit, from
+      a flash at (T_cooling_water, column P, feed composition). A small
+      remaining vapour fraction means ordinary cooling does the work and a
+      flash suffices; a fraction near 1 means cooling water accomplishes
+      nothing and a cryogenic or compression route is needed
+  limitations: >-
+    the verdict stands on the supercritical count alone, but the choice between
+    the two technologies offered does not: it is decided by that vapour
+    fraction, which this rule has not computed
 
 - id: R-06
   name: volatility gap wide enough for a single stage
@@ -100,9 +111,20 @@
   name: condenser needs refrigeration
   priority: 50
   when: "condensing_T_at_column_P < cooling_water_T"
-  verdict: caution
+  verdict: undetermined
   technologies: [distillation]
   because: >-
-    the overhead cannot be condensed against cooling water at 40 C, so
-    refrigeration is required, typically several times the cost of steam
+    the overhead cannot be condensed against cooling water at 40 C at the
+    current column pressure, so refrigeration MAY be required -- but raising
+    the column pressure raises the condensing temperature, and that has not
+    been tried yet
   cite: "Towler & Sinnott, Chemical Engineering Design, Ch.3"
+  requires:
+    - >-
+      condensing temperature recomputed at elevated column pressure: raise P
+      and re-check against the cooling-water limit before accepting
+      refrigeration. design.py already performs this search up to 30 bar
+  limitations: >-
+    above roughly 30 bar the compression needed to keep raising the pressure
+    usually costs more than the refrigeration it avoids, so the search must be
+    bounded rather than run to the pressure that happens to work
