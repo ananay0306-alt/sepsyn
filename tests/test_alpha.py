@@ -96,3 +96,35 @@ def test_supercritical_feed_reports_azeotrope_as_unknown_not_false():
     assert rec.has_azeotrope is None
     assert rec.min_alpha is None
     assert rec.feed_phase == "vapor"
+
+
+# --- bottoms temperature is a DESIGN quantity, not a screening one -----------
+
+
+def test_bottoms_temperature_is_none_without_a_heavy_key():
+    """Before a column is specified there is no bottoms. Asking whether steam
+    can drive the reboiler is a question about equipment that does not exist
+    yet, so the field must stay None and R-10/R-11 must not fire on a bare
+    feed screen."""
+    rec = build_property_record(methanol_water_glycerol())
+    assert rec.bottoms_T_at_column_P is None
+
+
+def test_bottoms_temperature_follows_the_HEAVY_KEY_not_the_heaviest_component():
+    """The heaviest component's pure boiling point is a valid upper bound but a
+    useless one: glycerol boils at 562 K while the actual bottoms, three
+    quarters water, boils near 375 K. Using the heaviest would fire the thermal
+    rules on every feed containing a trace heavy."""
+    rec = build_property_record(methanol_water_glycerol(),
+                                light_key="Methanol", heavy_key="Water")
+    assert rec.bottoms_T_at_column_P is not None
+    # water at 1 atm, not glycerol at 562 K
+    assert 370.0 < rec.bottoms_T_at_column_P < 378.0
+
+
+def test_steam_temperature_is_populated_so_R10_is_not_dead_code():
+    """Regression guard of the same shape as the condensing_T one: a field
+    left unpopulated makes its rule silently unfireable."""
+    rec = build_property_record(methanol_water_glycerol(),
+                                light_key="Methanol", heavy_key="Water")
+    assert rec.steam_T > 400.0

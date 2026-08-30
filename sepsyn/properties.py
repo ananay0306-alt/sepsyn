@@ -211,13 +211,22 @@ def build_property_record(
         lightest = min(feed.components, key=lambda c: boiling_point(c.cas))
         cond_T = condensing_temperature(lightest.name, P)
 
-    # The hot end. Heaviest component by normal boiling point sets the bottoms
-    # temperature, exactly as the lightest sets the condenser temperature above.
-    if n_super == len(feed.components):
+    # The hot end, and ONLY once a heavy key is named.
+    #
+    # Before a column is specified there is no bottoms, so asking whether steam
+    # can drive the reboiler is a question about equipment that does not exist
+    # yet. None here means "not a design yet", matching the key mole fractions
+    # below, and it keeps R-10 and R-11 from firing on a bare feed screen.
+    #
+    # The heavy key, NOT the heaviest component. The heaviest component's pure
+    # boiling point is a valid upper bound but a useless one: in the milestone
+    # acceptance feed, glycerol boils at 562 K while the real bottoms is three
+    # quarters water and boils near 375 K. Screening on the upper bound fired
+    # the thermal rules on any feed containing a trace heavy.
+    if heavy_key is None or n_super == len(feed.components):
         bottoms_T = None
     else:
-        heaviest = max(feed.components, key=lambda c: boiling_point(c.cas))
-        bottoms_T = condensing_temperature(heaviest.name, P)
+        bottoms_T = condensing_temperature(heavy_key, P)
 
     fracs = feed.mole_fractions
     return PropertyRecord(

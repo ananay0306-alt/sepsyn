@@ -20,9 +20,19 @@ def parse_feed(spec: str, T_K: float, P_Pa: float) -> Feed:
     return Feed(components=tuple(components), T_K=T_K, P_Pa=P_Pa)
 
 
-def screen(feed: Feed):
-    """Property record, all verdicts, and the overall answer."""
-    record = build_property_record(feed)
+def screen(feed: Feed, light_key: str | None = None,
+           heavy_key: str | None = None):
+    """Property record, all verdicts, and the overall answer.
+
+    The keys are optional but they MUST be forwarded when the user gave them.
+    Without them the record leaves light_key_mole_fraction,
+    heavy_key_mole_fraction and bottoms_T_at_column_P as None, and since
+    safe_eval treats any comparison against None as False, every rule naming
+    those properties silently cannot fire. R-07 and R-08 were unreachable from
+    the CLI for exactly this reason.
+    """
+    record = build_property_record(feed, light_key=light_key,
+                                   heavy_key=heavy_key)
     verdicts = evaluate(load_rules(), record)
     return record, verdicts, overall_verdict(verdicts)
 
@@ -114,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"sepsyn: {exc}", file=sys.stderr)
         return 2
 
-    record, verdicts, overall = screen(feed)
+    record, verdicts, overall = screen(feed, args.light_key, args.heavy_key)
     print(format_report(feed, record, verdicts, overall, explain=args.explain))
 
     if args.design:
