@@ -154,3 +154,69 @@ def test_flash_rejects_a_wrong_number_of_specifications(spec):
     assert r.error
     assert "vapor_fraction" in r.error
     assert "two degrees of freedom" in r.error
+
+
+def test_adapter_reports_the_thermal_fields():
+    """verify.py SKIPS its thermal checks when these are None, so an adapter
+    that does not fill them makes three checks silently unreachable -- the same
+    dead-code shape that hid R-07 and R-08 in the CLI."""
+    from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
+    from sepsyn.simulators.base import ColumnSpec
+    from sepsyn.types import Component, Feed
+
+    feed = Feed(
+        components=(Component("Methanol", "67-56-1", 100.0),
+                    Component("Water", "7732-18-5", 80.0)),
+        T_K=330.0, P_Pa=101325.0,
+    )
+    spec = ColumnSpec("Methanol", "Water", 0.99, 0.99, 101325.0)
+    r = BioSteamSimulator().design_column(feed, spec)
+
+    assert r.converged, r.error
+    assert r.condenser_duty_kW is not None and r.condenser_duty_kW > 0
+    assert r.reboiler_duty_kW is not None and r.reboiler_duty_kW > 0
+    assert r.distillate_T_K is not None and r.bottoms_T_K is not None
+    assert r.distillate_T_K < r.bottoms_T_K
+    assert None not in (r.feed_H_kW, r.distillate_H_kW, r.bottoms_H_kW)
+
+
+def test_the_thermal_checks_actually_run_on_a_real_design():
+    """End to end: the checks must appear in verify_column's output for a real
+    BioSTEAM design, not merely pass in a unit test with hand-made numbers."""
+    from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
+    from sepsyn.simulators.base import ColumnSpec
+    from sepsyn.types import Component, Feed
+    from sepsyn.verify import verify_column
+
+    feed = Feed(
+        components=(Component("Methanol", "67-56-1", 100.0),
+                    Component("Water", "7732-18-5", 80.0)),
+        T_K=330.0, P_Pa=101325.0,
+    )
+    spec = ColumnSpec("Methanol", "Water", 0.99, 0.99, 101325.0)
+    r = BioSteamSimulator().design_column(feed, spec)
+    got = {c.name for c in verify_column(feed, spec, r)}
+    assert {"condenser duty", "end temperatures", "energy balance"} <= got
+
+
+def test_the_adapter_asks_for_a_TOTAL_condenser():
+    """BinaryDistillation defaults to partial_condenser=True and the adapter
+    never set it, so every design sepsyn has ever produced had a vapour
+    distillate -- never chosen, just inherited. A total condenser is the normal
+    default and the one a liquid product spec implies. The duty check catches
+    the difference: a partial condenser condenses only the reflux, so it lands
+    near 16 kJ/mol instead of about 30."""
+    from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
+    from sepsyn.simulators.base import ColumnSpec
+    from sepsyn.types import Component, Feed
+    from sepsyn.verify import verify_column
+
+    feed = Feed(
+        components=(Component("Methanol", "67-56-1", 100.0),
+                    Component("Water", "7732-18-5", 80.0)),
+        T_K=330.0, P_Pa=101325.0,
+    )
+    spec = ColumnSpec("Methanol", "Water", 0.99, 0.99, 101325.0)
+    r = BioSteamSimulator().design_column(feed, spec)
+    duty = {c.name: c for c in verify_column(feed, spec, r)}["condenser duty"]
+    assert duty.passed, duty.detail

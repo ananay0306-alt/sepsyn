@@ -46,6 +46,17 @@ class ColumnResult:
     utility_cost_USD_hr: float
     converged: bool
     error: str | None = None
+    # Thermal results. All optional: an adapter that cannot supply them leaves
+    # them None and verify_column SKIPS the corresponding check rather than
+    # failing it, because absent is not the same as wrong. Duties are positive
+    # magnitudes in kW; enthalpies are stream enthalpy in kW.
+    condenser_duty_kW: float | None = None
+    reboiler_duty_kW: float | None = None
+    distillate_T_K: float | None = None
+    bottoms_T_K: float | None = None
+    feed_H_kW: float | None = None
+    distillate_H_kW: float | None = None
+    bottoms_H_kW: float | None = None
 
 
 @dataclass(frozen=True)

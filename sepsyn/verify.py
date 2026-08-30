@@ -30,6 +30,25 @@ from sepsyn.types import Feed
 MASS_BALANCE_TOL = 1e-3      # relative, PER COMPONENT
 RECOVERY_TOL = 1e-3          # absolute, on a fraction
 
+# Condenser duty divided by the overhead vapour it condenses is a molar latent
+# heat, and for ordinary organics that lands between about 20 and 50 kJ/mol.
+# The band is wide on purpose: it is not measuring latent heat, it is catching
+# a duty of the wrong SHAPE. A partial condenser condenses only the reflux and
+# so does roughly R/(R+1) of the work, landing well under the floor. That exact
+# mismatch produced a 58% disagreement between two simulators and nothing
+# detected it.
+LATENT_HEAT_FLOOR_J_MOL = 20_000.0
+LATENT_HEAT_CEILING_J_MOL = 50_000.0
+# Measured, not chosen. BioSTEAM's reboiler duty sits a CONSTANT 5.00 % above
+# the value that closes the balance against stream enthalpies -- measured at
+# exactly 5.00 % on methanol/water/glycerol, methanol/water, benzene/toluene,
+# and again at a different reflux ratio. Four cases, one number, so it is a
+# systematic margin in the model rather than model error. The tolerance sits
+# just above it: anything materially past 6 % is something new and worth
+# reading, while a real defect such as a partial condenser mistaken for a total
+# one moves this by tens of percent and is still caught easily.
+ENERGY_BALANCE_TOL = 0.06    # relative to reboiler duty
+
 
 @dataclass(frozen=True)
 class Check:
@@ -102,4 +121,60 @@ def verify_column(feed: Feed, spec: ColumnSpec, result: ColumnResult) -> list[Ch
         "reflux above minimum", result.reflux > result.minimum_reflux,
         f"reflux {result.reflux:.3f}, minimum {result.minimum_reflux:.3f}",
     ))
+
+    # Everything below tests a PREDICTED quantity. The checks above largely test
+    # imposed ones: a recovery the simulator was told to hit will be hit, so it
+    # cannot fail unless something upstream is badly wrong.
+    checks.extend(_thermal_checks(result))
     return checks
+
+
+def _thermal_checks(result: ColumnResult) -> list[Check]:
+    """Duty, end temperatures and energy balance, each SKIPPED when the
+    simulator did not report the inputs it needs. Absent is not wrong, and a
+    spurious FAIL on a capable-but-quiet adapter would train the reader to
+    ignore failures."""
+    out: list[Check] = []
+
+    D = sum(result.distillate.values())
+    if result.condenser_duty_kW is not None and D > 0:
+        V_mol_s = (result.reflux + 1.0) * D * 1000.0 / 3600.0   # V = (R+1)D
+        per_mol = result.condenser_duty_kW * 1000.0 / V_mol_s
+        out.append(Check(
+            "condenser duty",
+            LATENT_HEAT_FLOOR_J_MOL <= per_mol <= LATENT_HEAT_CEILING_J_MOL,
+            f"{result.condenser_duty_kW:.1f} kW over {V_mol_s*3.6:.1f} kmol/hr "
+            f"of overhead vapour = {per_mol/1000:.1f} kJ/mol (expected "
+            f"{LATENT_HEAT_FLOOR_J_MOL/1000:.0f} to "
+            f"{LATENT_HEAT_CEILING_J_MOL/1000:.0f}; under the floor usually "
+            f"means a partial condenser)",
+        ))
+
+    if result.distillate_T_K is not None and result.bottoms_T_K is not None:
+        ordered = result.distillate_T_K < result.bottoms_T_K
+        # Ordering only. Comparing each end against its key's boiling point
+        # needs thermodynamics, and this module deliberately has none: it takes
+        # a result and does arithmetic on it.
+        out.append(Check(
+            "end temperatures", ordered,
+            f"distillate {result.distillate_T_K:.1f} K, bottoms "
+            f"{result.bottoms_T_K:.1f} K"
+            + ("" if ordered else " -- inverted, the overhead cannot be hotter "
+                                  "than the bottoms"),
+        ))
+
+    if None not in (result.reboiler_duty_kW, result.condenser_duty_kW,
+                    result.feed_H_kW, result.distillate_H_kW,
+                    result.bottoms_H_kW):
+        net_heat = result.reboiler_duty_kW - result.condenser_duty_kW
+        net_enthalpy = (result.distillate_H_kW + result.bottoms_H_kW
+                        - result.feed_H_kW)
+        gap = abs(net_heat - net_enthalpy)
+        scale = abs(result.reboiler_duty_kW) or 1.0
+        out.append(Check(
+            "energy balance", gap / scale < ENERGY_BALANCE_TOL,
+            f"reboiler minus condenser {net_heat:.1f} kW against a product "
+            f"minus feed enthalpy of {net_enthalpy:.1f} kW "
+            f"({100*gap/scale:.2f}% of reboiler duty)",
+        ))
+    return out

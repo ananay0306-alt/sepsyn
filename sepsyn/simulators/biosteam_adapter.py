@@ -63,10 +63,28 @@ class BioSteamSimulator:
                     k=spec.reflux_over_minimum,
                     P=spec.pressure_Pa,
                     is_divided=False,
+                    # Stated, not inherited. BinaryDistillation defaults to a
+                    # PARTIAL condenser, which condenses only the reflux and so
+                    # does roughly R/(R+1) of the duty and hands back a vapour
+                    # distillate. A liquid product is the normal default and
+                    # the one every downstream cost and comparison assumes.
+                    partial_condenser=False,
                 )
                 col.simulate()
                 D, B = col.outs
                 d = col.design_results
+                # PROCESS duties, from the condenser and reboiler exchangers.
+                #
+                # NOT col.heat_utilities. Those are UTILITY duties -- what you
+                # buy -- and BioSTEAM inflates the steam side by the heating
+                # utility's efficiency, about 5%. Measured on the acceptance
+                # feed: utility Qr - Qc = 327.7 kW against col.Hnet of 221.8 kW,
+                # a constant 105.9 kW gap, while the process-side balance closes
+                # exactly. Mixing the two makes an energy-balance check compare
+                # purchased heat against process enthalpy and fail by ~5% on a
+                # perfectly good design. kJ/hr, so /3600 gives kW.
+                qc = abs(float(col.condenser.Q)) / 3600.0
+                qr = abs(float(col.reboiler.Q)) / 3600.0
                 return ColumnResult(
                     # Every feed component is reported, not just the keys.
                     # Nothing in a light/heavy-key spec constrains the others,
@@ -79,6 +97,13 @@ class BioSteamSimulator:
                     installed_cost_USD=float(col.installed_cost),
                     utility_cost_USD_hr=float(col.utility_cost),
                     converged=True, error=None,
+                    condenser_duty_kW=float(qc),
+                    reboiler_duty_kW=float(qr),
+                    distillate_T_K=float(D.T),
+                    bottoms_T_K=float(B.T),
+                    feed_H_kW=float(s.H) / 3600.0,
+                    distillate_H_kW=float(D.H) / 3600.0,
+                    bottoms_H_kW=float(B.H) / 3600.0,
                 )
         except Exception as exc:
             # Returned as data, never raised. A caller sweeping refluxes or

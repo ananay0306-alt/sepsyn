@@ -195,3 +195,89 @@ def test_a_small_but_real_imbalance_is_not_tolerated():
         "a 0.3% component gap must not be waved through"
     )
     assert "Glycerol" in detail(checks, "mass balance")
+
+
+# --- duty, temperature and energy checks (steps 39, 40, 41) -----------------
+#
+# These are the three checks that test PREDICTED quantities. Recoveries and
+# mass balance are largely imposed by the specification, so they cannot fail
+# unless something upstream is badly wrong. Duty and temperature can.
+
+
+def hot_result(**over):
+    """A converged design with the thermal fields populated. V = (R+1)D =
+    2.3 x 99.8 = 229.5 kmol/hr, so 1900 kW is about 29.8 kJ/mol of overhead
+    vapour, squarely in the normal latent-heat band."""
+    base = dict(
+        distillate={"Methanol": 99.0, "Water": 0.8},
+        bottoms={"Methanol": 1.0, "Water": 79.2},
+        stages=40, reflux=1.3, minimum_reflux=1.0,
+        installed_cost_USD=500_000, utility_cost_USD_hr=20.0,
+        converged=True, error=None,
+        condenser_duty_kW=1900.0, reboiler_duty_kW=2000.0,
+        distillate_T_K=338.0, bottoms_T_K=372.0,
+    )
+    base.update(over)
+    return ColumnResult(**base)
+
+
+def check_named(checks, name):
+    """The Check object itself, not just its pass flag. Deliberately a
+    different name from names() above: shadowing that helper silently turned
+    every pre-existing `is False` assertion into a comparison against a Check."""
+    return {c.name: c for c in checks}[name]
+
+
+def test_result_carries_the_thermal_fields():
+    r = hot_result()
+    assert r.condenser_duty_kW == 1900.0
+    assert r.reboiler_duty_kW == 2000.0
+    assert r.distillate_T_K == 338.0
+
+
+def test_condenser_duty_per_mole_of_vapour_is_checked():
+    c = check_named(verify_column(feed(), spec(), hot_result()), "condenser duty")
+    assert c.passed
+    assert "kJ/mol" in c.detail
+
+
+def test_a_partial_condenser_is_caught_by_the_duty_check():
+    """A partial condenser condenses only the reflux, so it does roughly
+    R/(R+1) of the duty. That is the exact mismatch that showed up as a 58
+    percent disagreement between two simulators, and nothing detected it."""
+    partial = hot_result(condenser_duty_kW=1900.0 * 1.3 / 2.3)
+    c = check_named(verify_column(feed(), spec(), partial), "condenser duty")
+    assert not c.passed
+
+
+def test_end_temperatures_must_not_be_inverted():
+    inverted = hot_result(distillate_T_K=380.0, bottoms_T_K=340.0)
+    c = check_named(verify_column(feed(), spec(), inverted), "end temperatures")
+    assert not c.passed
+
+
+def test_end_temperatures_pass_when_ordered_sensibly():
+    c = check_named(verify_column(feed(), spec(), hot_result()), "end temperatures")
+    assert c.passed
+
+
+def test_energy_balance_is_checked_against_the_duties():
+    """Reboiler minus condenser duty must account for the enthalpy the products
+    carry away over the feed."""
+    ok = hot_result(feed_H_kW=0.0, distillate_H_kW=40.0, bottoms_H_kW=60.0)
+    c = check_named(verify_column(feed(), spec(), ok), "energy balance")
+    assert c.passed
+
+
+def test_energy_balance_fails_when_the_duties_do_not_close():
+    bad = hot_result(feed_H_kW=0.0, distillate_H_kW=900.0, bottoms_H_kW=900.0)
+    c = check_named(verify_column(feed(), spec(), bad), "energy balance")
+    assert not c.passed
+
+
+def test_thermal_checks_are_skipped_when_the_simulator_did_not_report_them():
+    """An adapter that cannot supply duties must not cause a spurious FAIL.
+    Absent is not the same as wrong."""
+    checks = names(verify_column(feed(), spec(), good_result()))
+    assert "condenser duty" not in checks
+    assert "energy balance" not in checks
