@@ -1,6 +1,6 @@
 # sepsyn — status
 
-Updated 2026-08-30. Check this file; it is the tracker.
+Updated 2026-08-30 (evening). Check this file; it is the tracker.
 `cat STATUS.md` beats scrolling a chat log.
 
 ## Where we are
@@ -9,37 +9,23 @@ Updated 2026-08-30. Check this file; it is the tracker.
 |---|---|
 | Milestones done | **1 of 6** (M1 is the foundation the other five sit on) |
 | Tests | **125 passing**, 11 s |
-| Blocking right now | **iCloud has evicted the project.** See "Environment" below. It outranks everything. |
+| Blocking right now | **Risk 5**, re-tested and confirmed genuine. M2 needs a new acceptance case |
 | Waiting on you | **3 decisions** (below). M2 does not move until these are made. |
 
-## Environment problem, fix this first
+## Environment: FIXED 2026-08-30
 
-`~/Desktop` is iCloud synced and iCloud is **out of quota**. Files are evicted
-to stubs and must re-download on access, so the machine crawls.
+The project was on `~/Desktop`, which is iCloud synced, and iCloud was out of
+quota. 19,294 of 28,295 `.venv` files were evicted to stubs; `import
+thermosteam` hung for over 7 minutes and the suite went from 11 s to a 10 minute
+timeout.
 
-| | evicted |
-|---|---|
-| `.venv` | 19,294 of 28,295 files |
-| `dwsim-mcp` | 48 of 71 files |
-| `sepsyn` | 224 of 407 files |
+**Resolved.** The project now lives at `~/projects/process_simulation`, outside
+iCloud, with **zero dataless files**. `.venv` was rebuilt (biosteam 2.53.11,
+pytest, pyyaml, mcp 2.0.0) and both MCP servers were re-registered and report
+Connected. Suite is back to ~11 s.
 
-`brctl status` reports "Error uploading asset: Quota exceeded" 1,320 times.
-
-Symptoms seen: `import thermosteam` hung over 7 minutes with no output; the
-test suite went from 11 s to a 10 minute timeout. Nothing is corrupted or
-deleted, dataless files re-download intact.
-
-**Fix: move the project off `~/Desktop`.** Freeing iCloud space only helps
-until it fills again. After moving, recreate `.venv` (its scripts hardcode
-absolute paths) and re-register the MCP server with
-`claude mcp add --scope user dwsim <new-path>/dwsim-mcp.sh`. Git is unaffected.
-
-**This contaminates Risk 5.** The seven DWSIM configurations that failed on
-2026-08-27 ran against a server 68 % evicted. Run 6 failed with a real
-numerical message (mass balance 2.57e-4 against a 1e-4 tolerance) and that
-result stands, but runs 3, 4, 5 and 7 failed on *timeout*, which is exactly what
-a starved filesystem produces. **Re-test Risk 5 on a healthy machine before
-planning around it.**
+Risk 5 was re-tested there and **stands**; see the 08-27 revised spec. The
+eviction changed the failure mode, not the outcome.
 
 ## Decisions waiting on you
 
@@ -81,9 +67,9 @@ column is the REFERENCE, not a peer, so the gap measures shortcut error.
 - [x] Risk 2 resolved — `ShortcutColumn` spec inputs are public *fields*
 - [x] Found: the old acceptance criterion could not fail — recoveries impose
       the products, leaving one free number
-- [ ] **Risk 5 BLOCKING, and now in doubt** — rigorous reference did not solve
-      the acceptance case in seven configurations, but four failed on timeout
-      while the filesystem was starved. Re-test before trusting it
+- [x] Risk 5 **re-tested 08-30 on a healthy machine and CONFIRMED** — genuine
+      non-convergence, not a timeout artifact. M2 needs a new acceptance case;
+      benzene/toluene is the candidate
 - [ ] Risk 1 OPEN — the adapter's transport, and the real work
 - [ ] Not planned into tasks
 
@@ -107,9 +93,11 @@ covered about 20 of the 41.
       record gains `bottoms_T_at_column_P` and `steam_T`; `safe_eval` now
       permits arithmetic so thresholds can be expressed against another
       property in the rule file. 34 engine tests pass
-- [ ] **Item 2** — verification checks 39, 40, 41 (duty, end temperatures,
-      energy balance). BLOCKED: needs duty fields on `ColumnResult` and a
-      working BioSTEAM, so it waits on the environment fix
+- [x] **Item 2** — verification checks 39, 40, 41 done. Caught a real defect on
+      first run: BioSTEAM defaults to a PARTIAL condenser and the adapter never
+      set it, so every design had a vapour distillate. Now stated explicitly.
+      Energy tolerance measured at a constant 5.00 % model margin across four
+      cases, set to 6 %. **152 tests passing**
 - [ ] Item 3 — feed condition q, steps 15 to 17
 - [ ] Item 4 — equipment choices as rules, steps 22 to 25
 - [ ] Item 5 — a thin skill as the conversational front door

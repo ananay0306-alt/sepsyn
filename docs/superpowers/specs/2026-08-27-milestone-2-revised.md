@@ -220,3 +220,32 @@ are reported or used anywhere.
 
 **None of this is resolved.** It is recorded so that task planning starts from
 it rather than rediscovering it.
+
+## Risk 5 re-tested on a healthy machine (2026-08-30)
+
+The 08-27 runs were made while `~/Desktop` was iCloud evicted and `dwsim-mcp`
+was 68 % dataless, so four of the seven failures were *timeouts* and had to be
+treated as contaminated. The project now lives at
+`~/projects/process_simulation`, outside iCloud, with zero dataless files.
+
+Re-run there:
+
+| configuration | 08-27 | 08-30 |
+|---|---|---|
+| ternary, 2x Component Recovery, 30 stages, Napthali-Sandholm, 300 iter | timeout | **max iterations, returned promptly** |
+| ternary, Reflux 2.0 + Product Flow, 20 stages, Wang-Henke, 2000 iter | timeout | **max iterations, returned promptly** |
+
+**Risk 5 stands. It was not an artifact.** What the eviction changed was the
+failure *mode*, not the outcome: a genuine non-convergence was being reported as
+a timeout, which hid the fact that the solver was reaching its iteration cap
+rather than being starved of CPU. The rigorous column does not converge on
+methanol / water / glycerol across two spec types, two solvers, two stage
+counts and iteration limits up to 2000.
+
+The conclusions drawn from it therefore hold unchanged: the acceptance case is
+the wrong case for a rigorous reference, and benzene/toluene remains the
+sensible bring-up candidate.
+
+One correction to the 08-27 reasoning. Solve times are NOT the argument for
+recorded fixtures that they appeared to be, because the slowness was
+environmental. Risk 1 must be decided on the protocol question alone.
