@@ -1,6 +1,6 @@
 # sepsyn — status
 
-Updated 2026-08-27. Check this file; it is the tracker.
+Updated 2026-08-30. Check this file; it is the tracker.
 `cat STATUS.md` beats scrolling a chat log.
 
 ## Where we are
@@ -9,8 +9,37 @@ Updated 2026-08-27. Check this file; it is the tracker.
 |---|---|
 | Milestones done | **1 of 6** (M1 is the foundation the other five sit on) |
 | Tests | **125 passing**, 11 s |
-| Blocking right now | **Risk 5** — the rigorous reference will not solve the M2 acceptance case |
+| Blocking right now | **iCloud has evicted the project.** See "Environment" below. It outranks everything. |
 | Waiting on you | **3 decisions** (below). M2 does not move until these are made. |
+
+## Environment problem, fix this first
+
+`~/Desktop` is iCloud synced and iCloud is **out of quota**. Files are evicted
+to stubs and must re-download on access, so the machine crawls.
+
+| | evicted |
+|---|---|
+| `.venv` | 19,294 of 28,295 files |
+| `dwsim-mcp` | 48 of 71 files |
+| `sepsyn` | 224 of 407 files |
+
+`brctl status` reports "Error uploading asset: Quota exceeded" 1,320 times.
+
+Symptoms seen: `import thermosteam` hung over 7 minutes with no output; the
+test suite went from 11 s to a 10 minute timeout. Nothing is corrupted or
+deleted, dataless files re-download intact.
+
+**Fix: move the project off `~/Desktop`.** Freeing iCloud space only helps
+until it fills again. After moving, recreate `.venv` (its scripts hardcode
+absolute paths) and re-register the MCP server with
+`claude mcp add --scope user dwsim <new-path>/dwsim-mcp.sh`. Git is unaffected.
+
+**This contaminates Risk 5.** The seven DWSIM configurations that failed on
+2026-08-27 ran against a server 68 % evicted. Run 6 failed with a real
+numerical message (mass balance 2.57e-4 against a 1e-4 tolerance) and that
+result stands, but runs 3, 4, 5 and 7 failed on *timeout*, which is exactly what
+a starved filesystem produces. **Re-test Risk 5 on a healthy machine before
+planning around it.**
 
 ## Decisions waiting on you
 
@@ -52,8 +81,9 @@ column is the REFERENCE, not a peer, so the gap measures shortcut error.
 - [x] Risk 2 resolved — `ShortcutColumn` spec inputs are public *fields*
 - [x] Found: the old acceptance criterion could not fail — recoveries impose
       the products, leaving one free number
-- [ ] **Risk 5 BLOCKING** — rigorous reference does not solve the acceptance
-      case. Seven configurations, none converged
+- [ ] **Risk 5 BLOCKING, and now in doubt** — rigorous reference did not solve
+      the acceptance case in seven configurations, but four failed on timeout
+      while the filesystem was starved. Re-test before trusting it
 - [ ] Risk 1 OPEN — the adapter's transport, and the real work
 - [ ] Not planned into tasks
 
@@ -69,6 +99,20 @@ Every gap found on 08-27, and what it turned out to be:
 The lesson: every large disagreement but one was a configuration or definition
 mismatch, not physics. **The harness must assert configuration equivalence, not
 just compare numbers.**
+
+### [~] Workflow steps from the binary heuristics list · ITEM 1 DONE
+The 41 step design sequence, being folded into the rule table. sepsyn already
+covered about 20 of the 41.
+- [x] **Item 1** — reboiler side pressure rule (R-10) and thermal limit (R-11);
+      record gains `bottoms_T_at_column_P` and `steam_T`; `safe_eval` now
+      permits arithmetic so thresholds can be expressed against another
+      property in the rule file. 34 engine tests pass
+- [ ] **Item 2** — verification checks 39, 40, 41 (duty, end temperatures,
+      energy balance). BLOCKED: needs duty fields on `ColumnResult` and a
+      working BioSTEAM, so it waits on the environment fix
+- [ ] Item 3 — feed condition q, steps 15 to 17
+- [ ] Item 4 — equipment choices as rules, steps 22 to 25
+- [ ] Item 5 — a thin skill as the conversational front door
 
 ### [ ] M3 — sequencing multicomponent trains · NOT STARTED, NO SPEC
 Today the tool stops at one column and says so. The "NOT SPECIFIED … separate
