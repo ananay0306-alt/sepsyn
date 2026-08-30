@@ -128,3 +128,48 @@
     above roughly 30 bar the compression needed to keep raising the pressure
     usually costs more than the refrigeration it avoids, so the search must be
     bounded rather than run to the pressure that happens to work
+
+- id: R-10
+  name: reboiler needs more than the available steam
+  priority: 50
+  when: "bottoms_T_at_column_P > steam_T - 5"
+  verdict: caution
+  technologies: [distillation]
+  because: >-
+    the bottoms boils at or above the available steam temperature, leaving no
+    driving force in the reboiler; a hotter utility or a fired heater is needed,
+    or the column pressure must come down
+  cite: "Towler & Sinnott, Chemical Engineering Design, Ch.3"
+  requires:
+    - >-
+      bottoms boiling temperature recomputed at a lower column pressure, since
+      lowering pressure lowers it. Check the result against R-09 first, because
+      the same move can push the overhead below cooling water
+  limitations: >-
+    the two pressure rules pull in opposite directions and the condenser side
+    wins when they conflict, because refrigeration costs several times what a
+    hotter utility does. Note also that condenser and reboiler pressures are not
+    independent: they are linked by the column pressure drop, roughly 0.1 psi
+    per stage
+
+- id: R-11
+  name: bottoms hot enough to risk thermal damage
+  priority: 45
+  when: "bottoms_T_at_column_P > 473.15"
+  verdict: undetermined
+  technologies: [distillation, vacuum_distillation]
+  because: >-
+    above about 200 C many organics decompose, polymerise or foul, and the
+    bottoms is the hottest and longest-residence part of the column; whether
+    this one does cannot be decided from boiling points alone
+  cite: "Seader & Henley, Separation Process Principles, Ch.7"
+  requires:
+    - >-
+      decomposition or polymerisation onset temperature of the bottoms
+      component, which is not in the property database and must be supplied
+      from literature or a supplier data sheet
+  limitations: >-
+    a false alarm is cheap and a missed one plugs a column, so this fires on
+    temperature alone. If the component is thermally robust the rule is simply
+    dismissed; if it is not, the usual answer is vacuum operation, which then
+    conflicts with the preference for pressures at or above one atmosphere

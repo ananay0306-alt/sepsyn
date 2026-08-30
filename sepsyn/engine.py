@@ -19,6 +19,11 @@ _ALLOWED_NODES = (
     ast.Expression, ast.BoolOp, ast.UnaryOp, ast.Compare, ast.Name, ast.Load,
     ast.Constant, ast.And, ast.Or, ast.Not, ast.Eq, ast.NotEq, ast.Lt,
     ast.LtE, ast.Gt, ast.GtE, ast.Is, ast.IsNot,
+    # Arithmetic, so a threshold can be expressed against another property
+    # ("5 K below the available steam") in the rule file rather than baked into
+    # Python. Pow is deliberately absent: 9**9**9 is a one-line hang, and no
+    # rule has ever needed it.
+    ast.BinOp, ast.Add, ast.Sub, ast.Mult, ast.Div,
 )
 
 
@@ -80,6 +85,23 @@ def safe_eval(expr: str, namespace: dict[str, Any]) -> bool:
         if isinstance(node, ast.BoolOp):
             vals = [_eval(v) for v in node.values]
             return all(vals) if isinstance(node.op, ast.And) else any(vals)
+        if isinstance(node, ast.BinOp):
+            left = _eval(node.left)
+            right = _eval(node.right)
+            # A missing property must stay missing through the arithmetic, so
+            # that the comparison's None guard still declines to fire the rule.
+            # Raising here, or substituting 0, would both invent a value.
+            if left is None or right is None:
+                return None
+            op = type(node.op)
+            if op is ast.Div and right == 0:
+                return None
+            return {
+                ast.Add: lambda a, b: a + b,
+                ast.Sub: lambda a, b: a - b,
+                ast.Mult: lambda a, b: a * b,
+                ast.Div: lambda a, b: a / b,
+            }[op](left, right)
         if isinstance(node, ast.Compare):
             left = _eval(node.left)
             for op, comp in zip(node.ops, node.comparators):

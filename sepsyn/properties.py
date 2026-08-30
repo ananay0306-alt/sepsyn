@@ -82,6 +82,8 @@ def critical_pressure(cas: str) -> float:
 from sepsyn.types import Feed
 
 COOLING_WATER_T = 313.15  # K, 40 C -- design limit used throughout
+STEAM_T = 433.15          # K, 160 C -- low pressure steam, the default hot utility
+STEAM_APPROACH_K = 5.0    # K, driving force the reboiler needs below the steam
 
 
 def count_supercritical(feed: Feed) -> int:
@@ -209,6 +211,14 @@ def build_property_record(
         lightest = min(feed.components, key=lambda c: boiling_point(c.cas))
         cond_T = condensing_temperature(lightest.name, P)
 
+    # The hot end. Heaviest component by normal boiling point sets the bottoms
+    # temperature, exactly as the lightest sets the condenser temperature above.
+    if n_super == len(feed.components):
+        bottoms_T = None
+    else:
+        heaviest = max(feed.components, key=lambda c: boiling_point(c.cas))
+        bottoms_T = condensing_temperature(heaviest.name, P)
+
     fracs = feed.mole_fractions
     return PropertyRecord(
         n_components=len(feed.components),
@@ -221,4 +231,6 @@ def build_property_record(
         cooling_water_T=COOLING_WATER_T,
         light_key_mole_fraction=fracs.get(light_key) if light_key else None,
         heavy_key_mole_fraction=fracs.get(heavy_key) if heavy_key else None,
+        bottoms_T_at_column_P=bottoms_T,
+        steam_T=STEAM_T,
     )

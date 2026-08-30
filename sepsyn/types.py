@@ -11,6 +11,8 @@ RULE_VISIBLE_FIELDS = frozenset({
     "cooling_water_T",
     "light_key_mole_fraction",
     "heavy_key_mole_fraction",
+    "bottoms_T_at_column_P",
+    "steam_T",
 })
 
 
@@ -80,6 +82,13 @@ class PropertyRecord:
     cooling_water_T: float
     light_key_mole_fraction: float | None
     heavy_key_mole_fraction: float | None
+    bottoms_T_at_column_P: float | None = None
+    """Boiling temperature of the heaviest component at column pressure. The
+    hot end of the column, and the counterpart to condensing_T_at_column_P.
+    None means it could not be computed, NOT that the column runs cold."""
+    steam_T: float = 433.15
+    """Available heating utility temperature. Default mirrors
+    properties.STEAM_T (low pressure steam, 160 C)."""
 
     def as_namespace(self) -> dict[str, object]:
         """Flat scalars for rule evaluation. Structured fields are withheld."""

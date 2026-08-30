@@ -39,8 +39,8 @@ def test_safe_eval_refuses_unknown_names():
 
 def test_rules_load_and_are_well_formed():
     rules = load_rules()
-    assert len(rules) == 9
-    assert len({r.id for r in rules}) == 9          # ids are unique
+    assert len(rules) == 11
+    assert len({r.id for r in rules}) == 11         # ids are unique
     # load_rules sorts by PRIORITY, not by id -- R-04 (supercritical) must be
     # evaluated before R-01 (distillation viable)
     priorities = [r.priority for r in rules]
@@ -55,7 +55,7 @@ def test_every_rule_condition_evaluates_against_a_record():
     """A rule whose condition cannot be evaluated is a broken rule."""
     ns = record().as_namespace()
     rules = load_rules()
-    assert len(rules) == 9  # otherwise this test passes vacuously on []
+    assert len(rules) == 11  # otherwise this test passes vacuously on []
     for r in rules:
         result = safe_eval(r.when, ns)
         assert isinstance(result, bool)
@@ -113,11 +113,11 @@ def test_invalid_verdict_string_is_rejected_at_load(tmp_path):
         load_rules(str(p))
 
 
-def test_shipped_rules_still_load_all_nine():
+def test_shipped_rules_all_load():
     """Guard against the new validators being too strict and rejecting a
     legitimate rule in the real rules.yaml."""
     rules = load_rules()
-    assert len(rules) == 9
+    assert len(rules) == 11
 
 
 def test_as_namespace_and_validator_share_one_source_of_truth():
@@ -289,3 +289,96 @@ def test_R05_declares_the_calculation_that_picks_its_technology():
     r = {x.id: x for x in load_rules()}["R-05"]
     assert r.requires
     assert any("vapour fraction" in item.lower() for item in r.requires)
+
+
+# --- reboiler-side pressure rule (step 11) and thermal limit (step 7) --------
+#
+# R-09 covers only the COLD end: can the overhead condense against cooling
+# water. A bottoms that boils ABOVE the available steam is just as much a
+# blocker -- it forces a fired heater -- and nothing tested for it.
+
+
+def test_record_exposes_the_bottoms_temperature_and_steam_temperature():
+    ns = record().as_namespace()
+    assert "bottoms_T_at_column_P" in ns
+    assert "steam_T" in ns
+
+
+def test_R10_fires_when_the_bottoms_boils_above_the_available_steam():
+    from sepsyn.engine import evaluate
+    rules = load_rules()
+    hot = record(bottoms_T_at_column_P=460.0, steam_T=433.15)
+    fired = {v.rule_id for v in evaluate(rules, hot) if v.fired}
+    assert "R-10" in fired
+
+
+def test_R10_does_not_fire_when_steam_can_drive_the_reboiler():
+    from sepsyn.engine import evaluate
+    rules = load_rules()
+    ok = record(bottoms_T_at_column_P=373.0, steam_T=433.15)
+    fired = {v.rule_id for v in evaluate(rules, ok) if v.fired}
+    assert "R-10" not in fired
+
+
+def test_R10_respects_the_five_degree_approach():
+    """430 K against 433.15 K steam is only a 3.15 K driving force, which is
+    below the 5 K allowance, so the rule must still fire."""
+    from sepsyn.engine import evaluate
+    rules = load_rules()
+    marginal = record(bottoms_T_at_column_P=430.0, steam_T=433.15)
+    fired = {v.rule_id for v in evaluate(rules, marginal) if v.fired}
+    assert "R-10" in fired
+
+
+def test_R11_asks_for_the_decomposition_temperature_on_a_hot_column():
+    """Decomposition temperature is not in the property database. Rather than
+    guess it or ignore the risk, the rule declares the calculation it needs."""
+    from sepsyn.engine import evaluate
+    rules = load_rules()
+    hot = record(bottoms_T_at_column_P=500.0)
+    v = [x for x in evaluate(rules, hot) if x.rule_id == "R-11"][0]
+    assert v.fired
+    assert v.verdict == "undetermined"
+    assert any("decomposition" in r.lower() for r in v.requires)
+
+
+def test_R11_stays_quiet_on_an_ordinary_column():
+    from sepsyn.engine import evaluate
+    rules = load_rules()
+    mild = record(bottoms_T_at_column_P=373.0)
+    fired = {v.rule_id for v in evaluate(rules, mild) if v.fired}
+    assert "R-11" not in fired
+
+
+# --- arithmetic in rule conditions -------------------------------------------
+#
+# A threshold expressed against another property ("5 K below the steam") is a
+# judgment, and judgments belong in rules.yaml. Without arithmetic the 5 would
+# have to be baked into Python, which breaks the promise that the rule file
+# alone changes the tool's judgment.
+
+
+def test_safe_eval_allows_arithmetic_against_another_property():
+    assert safe_eval("a > b - 5", {"a": 10.0, "b": 12.0}) is True
+    assert safe_eval("a > b - 5", {"a": 6.0, "b": 12.0}) is False
+
+
+def test_safe_eval_supports_the_four_basic_operators():
+    ns = {"a": 10.0}
+    assert safe_eval("a + 1 > 10", ns) is True
+    assert safe_eval("a - 1 > 10", ns) is False
+    assert safe_eval("a * 2 > 19", ns) is True
+    assert safe_eval("a / 2 > 4", ns) is True
+
+
+def test_safe_eval_still_refuses_exponentiation():
+    """Allowing arithmetic must not open a cheap way to hang the evaluator:
+    9**9**9 is a one-line denial of service."""
+    with pytest.raises(ValueError, match="not permitted"):
+        safe_eval("a ** 9 > 1", {"a": 9.0})
+
+
+def test_arithmetic_on_a_missing_property_is_still_false():
+    """The None guard must survive the operand being inside an expression."""
+    assert safe_eval("a > b - 5", {"a": 10.0, "b": None}) is False
+    assert safe_eval("a - 5 > b", {"a": None, "b": 1.0}) is False
