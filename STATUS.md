@@ -1,6 +1,6 @@
 # sepsyn — status
 
-Updated 2026-08-30 (late evening). Check this file; it is the tracker.
+Updated 2026-08-31. Check this file; it is the tracker.
 `cat STATUS.md` beats scrolling a chat log.
 
 ## Where we are
@@ -8,9 +8,10 @@ Updated 2026-08-30 (late evening). Check this file; it is the tracker.
 | | |
 |---|---|
 | Milestones done | **1 of 6**, plus the 41-step heuristics fold-in COMPLETE |
-| Tests | **223 passing**, 17 s |
+| Tests | **230 passing**, 17 s |
 | Blocking right now | **Risk 5**, re-tested and confirmed genuine. M2 needs a new acceptance case |
-| Waiting on you | **3 decisions** (below). M2 does not move until these are made. |
+| Waiting on you | **2 decisions** (below). M2 does not move until these are made. |
+| Published | **public** at github.com/ananay0306-alt/sepsyn, MIT |
 
 ## Environment: FIXED 2026-08-30
 
@@ -29,13 +30,15 @@ eviction changed the failure mode, not the outcome.
 
 ## Decisions waiting on you
 
-- [ ] **1. Merge `m2-risk2-shortcut-config` into `main`?**
-      5 commits, all documentation, each stands alone. *Recommend: yes.*
-- [ ] **2. Switch the M2 bring-up case to benzene/toluene?**
+- [x] ~~**Merge `m2-risk2-shortcut-config` into `main`?**~~ **DONE 08-31.**
+      It had become the de facto trunk: 21 commits, not 5, and `main` was that
+      far behind. Fast-forwarded, so nothing was rewritten, and
+      `rule-schema-requires` turned out to be already contained.
+- [ ] **1. Switch the M2 bring-up case to benzene/toluene?**
       Methanol/water/glycerol was chosen when both sides were shortcut methods
       and will not solve rigorously. Benzene/toluene solved rigorously in
       seconds. *Recommend: yes*, keep methanol/water as a later stress case.
-- [ ] **3. M2 transport — live subprocess, recorded fixtures, or both?**
+- [ ] **2. M2 transport — live subprocess, recorded fixtures, or both?**
       Solve times of minutes make a live adapter impractical in the suite.
       *Recommend: both* — fixtures for a hermetic suite, live behind an opt-in
       marker, since fixtures alone prove nothing about the protocol.
@@ -187,7 +190,70 @@ Specify the column, compare predicted purities. Nothing imposed either side.
 
 | | |
 |---|---|
-| `main` | `92d6ed5` — M1 plus the rule schema extension |
-| `m2-risk2-shortcut-config` | 5 commits, unmerged — revised M2 spec and every finding |
-| Specs | 08-22 M2 spec marked superseded, kept as evidence log; plan from the 08-27 revision |
+| `main` | current, and now the trunk. 60 commits |
+| Remote | `github.com/ananay0306-alt/sepsyn`, public, MIT |
+| Specs | `docs/specs/` (was `docs/superpowers/specs/`). 08-22 M2 spec marked superseded, kept as evidence log; plan from the 08-27 revision |
+| Demo | `./demo.sh`, eight beats, pauses between them |
+| Skill | `skill/SKILL.md`, symlinked to `~/.claude/skills/sepsyn` |
 | Probe flowsheet | `../sepsyn_m2_shortcut_probe.dwxmz`, opens in the DWSIM GUI |
+| Written for review | `~/Desktop/dwsim_memo/Binary_Distillation_Given_Required_Derived.pdf`, current. Two earlier versions superseded, see below |
+
+## Published 2026-08-31
+
+Public, MIT, `main` as default. `docs/` was 39 percent of the repository and
+larger than the source; the milestone plan, the SDD ledger and the session
+handoff were removed as process exhaust that says nothing about distillation.
+Removed with `git rm`, not a history rewrite: nothing is sensitive, and the
+commit messages carry the measured findings. Proportions are now source 40,
+tests 39, docs 13.
+
+Added so a clone can actually run: README, `requirements.txt` pinned to the
+versions every finding was measured against, MIT `LICENSE`, and a `demo.sh`
+that finds an interpreter instead of assuming `../.venv` (which is outside the
+repo root in this working copy).
+
+`STATUS.md` is public. It reads as internal notes, deliberately. If that stops
+being wanted, split the findings into `FINDINGS.md` rather than deleting.
+
+## Review 2026-08-31: the ordering was wrong, and so was the code
+
+Raised in review, and it invalidated both written documents plus a live number.
+
+**Relative volatility cannot be screened before the pressure is settled**,
+because alpha is a property of a pair AT a condition. Phase one depended on the
+output of phase two. The screening code had inherited the same order and
+evaluated alpha at the FEED pressure while the column was designed elsewhere:
+
+| propane / n-butane | alpha |
+|---|---|
+| screened at feed pressure, 1.01 bar | 6.100 |
+| at the real column pressure, 13.69 bar | 3.383 |
+| error in the reported screening number | **80.3 %** |
+
+Larger than the 58 percent condenser discrepancy this project exists to
+prevent. Fixed: `resolve_column_pressure` settles it first and returns three
+distinct outcomes, `specified` / `derived` / `fallback`, and both `screen()` and
+`design_if_feasible()` call it so they cannot diverge. `--column-P` added.
+
+**A specified value DISABLES its heuristic**, it does not skip it. If the user
+gives a pressure, "start at one atmosphere and work upward" never runs at all.
+That is the reviewer's second point and it forced the document restructure: the
+steps had been classified by what they DO and never by where their values COME
+FROM.
+
+**Optimisation is out of the design sequence.** Economic reflux and heat
+integration answer a different question (which of the columns that work is
+cheapest), need cost data nothing else needs, and can be skipped without
+leaving a gap. A step that can be skipped without leaving a gap is not part of
+the procedure.
+
+Documents, in order, each superseding the last:
+
+| Document | Status |
+|---|---|
+| `Binary_Distillation_Heuristics.pdf` | superseded. 41 steps as one numbered sequence |
+| `Binary_Distillation_Design_Graph.pdf` | superseded. Gates, triggers, records. Still put screening before pressure |
+| `Binary_Distillation_Given_Required_Derived.pdf` | **current.** Classified by provenance; pressure precedes alpha; optimisation removed |
+
+Open from the same review: a point about condenser and reboiler types that
+could not be transcribed clearly. Ask before acting on it.
