@@ -188,6 +188,7 @@ def build_property_record(
     column_P_Pa: float | None = None,
     light_key: str | None = None,
     heavy_key: str | None = None,
+    column_P_basis: str = "",
 ) -> PropertyRecord:
     """Assemble everything the rule engine is allowed to see."""
     P = column_P_Pa if column_P_Pa is not None else feed.P_Pa
@@ -262,5 +263,7 @@ def build_property_record(
         heavy_key_mole_fraction=fracs.get(heavy_key) if heavy_key else None,
         bottoms_T_at_column_P=bottoms_T,
         has_two_liquid_phases=splits,
+        column_P_Pa=P,
+        column_P_basis=column_P_basis,
         steam_T=STEAM_T,
     )

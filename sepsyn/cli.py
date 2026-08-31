@@ -20,8 +20,50 @@ def parse_feed(spec: str, T_K: float, P_Pa: float) -> Feed:
     return Feed(components=tuple(components), T_K=T_K, P_Pa=P_Pa)
 
 
+def resolve_column_pressure(feed: Feed, light_key: str | None,
+                            column_P_Pa: float | None) -> tuple[float, str]:
+    """Settle the column pressure BEFORE anything is evaluated at it.
+
+    Raised in review, and it invalidated the ordering this tool inherited:
+    relative volatility is a property of a pair AT a condition, so screening
+    cannot precede the pressure decision. Screening used to run at the FEED
+    pressure while the column was later designed somewhere else entirely. On
+    propane/n-butane that reported alpha 6.100 for a column that actually runs
+    at 13.69 bar with alpha 3.383 -- an 80 percent error in the headline
+    screening number.
+
+    Three outcomes, kept distinct because they are three different things the
+    tool knows:
+
+      specified  the user fixed it, so the pressure heuristic does not run at
+                 all. This is the reviewer's point: a heuristic for a value
+                 the user has already given is not skipped, it is DISABLED
+      derived    no pressure was given, so the cooling-water heuristic chose one
+      fallback   no pressure and no light key, so there is nothing to condense
+                 against and the pressure cannot be settled. The feed pressure
+                 is used and SAID to be unsettled, rather than a feed-pressure
+                 alpha being presented as a column alpha
+    """
+    if column_P_Pa is not None:
+        return column_P_Pa, (
+            f"specified as {column_P_Pa/1e5:.3f} bar; the pressure heuristic "
+            f"was not run"
+        )
+    if light_key is None:
+        return feed.P_Pa, (
+            f"feed pressure {feed.P_Pa/1e5:.3f} bar used because the column "
+            f"pressure has not been settled: without a light key there is "
+            f"nothing to condense against. Name the keys, or give a pressure"
+        )
+    from sepsyn.design import choose_pressure
+
+    pressure, note = choose_pressure(feed, light_key)
+    return pressure, f"derived, {note}"
+
+
 def screen(feed: Feed, light_key: str | None = None,
-           heavy_key: str | None = None):
+           heavy_key: str | None = None,
+           column_P_Pa: float | None = None):
     """Property record, all verdicts, and the overall answer.
 
     The keys are optional but they MUST be forwarded when the user gave them.
@@ -30,9 +72,14 @@ def screen(feed: Feed, light_key: str | None = None,
     safe_eval treats any comparison against None as False, every rule naming
     those properties silently cannot fire. R-07 and R-08 were unreachable from
     the CLI for exactly this reason.
+
+    Every property is evaluated at the COLUMN pressure, which is settled first.
+    See resolve_column_pressure.
     """
-    record = build_property_record(feed, light_key=light_key,
-                                   heavy_key=heavy_key)
+    pressure, basis = resolve_column_pressure(feed, light_key, column_P_Pa)
+    record = build_property_record(feed, column_P_Pa=pressure,
+                                   light_key=light_key, heavy_key=heavy_key,
+                                   column_P_basis=basis)
     verdicts = evaluate(load_rules(), record)
     return record, verdicts, overall_verdict(verdicts)
 
@@ -41,7 +88,8 @@ def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
                        lk_recovery: float = 0.99, hk_recovery: float = 0.99,
                        distillate_purity: float | None = None,
                        bottoms_impurity: float | None = None,
-                       feed_q: float | None = None):
+                       feed_q: float | None = None,
+                       column_P_Pa: float | None = None):
     """Design the column and report what the specification did NOT cover.
 
     Recoveries may be given directly, or TOTAL-stream purities may be given and
@@ -54,8 +102,7 @@ def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
     """
     from dataclasses import replace
 
-    from sepsyn.design import (best_point, choose_pressure, recoveries_for_purity,
-                               sweep_reflux)
+    from sepsyn.design import best_point, recoveries_for_purity, sweep_reflux
     from sepsyn.equipment import DesignContext, choose_equipment
     from sepsyn.properties import condensing_temperature, count_supercritical
     from sepsyn.simulators.base import ColumnResult, ColumnSpec
@@ -70,7 +117,10 @@ def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
         lk_recovery, hk_recovery = recoveries_for_purity(
             feed, light_key, heavy_key, distillate_purity, bottoms_impurity)
 
-    pressure, _note = choose_pressure(feed, light_key)
+    # The SAME resolution screening used. Deriving it twice invites the two to
+    # disagree, and a design built at a pressure the screening never saw is the
+    # bug this function was just fixed for.
+    pressure, _basis = resolve_column_pressure(feed, light_key, column_P_Pa)
 
     # Equipment choices are settled in TWO passes, and the split is forced by
     # the physics rather than chosen for tidiness. Step 22 must be decided
@@ -137,6 +187,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--feed", required=True, help="e.g. 'Methanol:100,Water:80'")
     p.add_argument("--T", type=float, default=298.15, help="feed temperature, K")
     p.add_argument("--P", type=float, default=101325.0, help="feed pressure, Pa")
+    p.add_argument("--column-P", type=float,
+                   help="column operating pressure, Pa. Giving it DISABLES the "
+                        "cooling-water pressure heuristic rather than running "
+                        "it and overriding the answer. Omit to let the tool "
+                        "settle the pressure; either way every property is "
+                        "evaluated at the pressure that ends up being used")
     p.add_argument("--explain", action="store_true",
                    help="also print rules that did not fire, with their values")
     p.add_argument("--design", action="store_true",
@@ -168,7 +224,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"sepsyn: {exc}", file=sys.stderr)
         return 2
 
-    record, verdicts, overall = screen(feed, args.light_key, args.heavy_key)
+    record, verdicts, overall = screen(feed, args.light_key, args.heavy_key,
+                                       column_P_Pa=args.column_P)
     print(format_report(feed, record, verdicts, overall, explain=args.explain))
 
     if args.design:
@@ -185,7 +242,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.lk_recovery, args.hk_recovery,
                 distillate_purity=args.distillate_purity,
                 bottoms_impurity=args.bottoms_impurity,
-                feed_q=args.feed_q)
+                feed_q=args.feed_q,
+                column_P_Pa=args.column_P)
         except ValueError as exc:
             print(f"\nCannot design: {exc}")
             return 2

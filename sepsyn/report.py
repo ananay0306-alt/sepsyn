@@ -18,6 +18,14 @@ def format_report(
     spec = ", ".join(f"{c.name} {c.flow_kmol_hr:g} kmol/hr" for c in feed.components)
     lines.append(f"FEED   {spec}  @ {feed.T_K:.2f} K, {feed.P_Pa/1e5:.3f} bar")
     lines.append("")
+    if record.column_P_Pa is not None:
+        # Printed BEFORE the properties, because every one of them was
+        # evaluated at this pressure and none of them means anything without
+        # it. Screening once ran at the feed pressure while the column was
+        # designed elsewhere; stating the pressure and its origin is what makes
+        # that visible rather than merely wrong.
+        lines.extend(_wrapped("COLUMN PRESSURE  ", record.column_P_basis))
+    lines.append("")
     lines.append("PROPERTIES")
     lines.append(f"  {'component':<12}{'Tb (K)':>10}{'Tc (K)':>10}   state at feed")
     for c in feed.components:

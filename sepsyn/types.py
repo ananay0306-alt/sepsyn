@@ -91,6 +91,19 @@ class PropertyRecord:
     """True/False if the liquid-liquid search actually ran; None means it was
     never checked (no liquid phase exists at feed conditions), which is NOT the
     same claim as "checked and found none". Heuristic step 6."""
+    column_P_Pa: float | None = None
+    """The pressure every property in this record was evaluated at.
+
+    Carried because relative volatility is a property of a pair AT a condition:
+    a record whose alphas were computed at one pressure while the column runs
+    at another describes a different column. Deliberately NOT rule-visible --
+    no screening rule should branch on the pressure itself, only on the
+    properties evaluated there."""
+    column_P_basis: str = ""
+    """Where that pressure came from: specified by the user, derived from the
+    cooling-water heuristic, or fallen back to the feed pressure because it
+    could not be settled. Three different epistemic states, and collapsing them
+    is how a feed-pressure alpha gets presented as a column alpha."""
     steam_T: float = 433.15
     """Available heating utility temperature. Default mirrors
     properties.STEAM_T (low pressure steam, 160 C)."""
