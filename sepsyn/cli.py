@@ -193,6 +193,13 @@ def main(argv: list[str] | None = None) -> int:
                         "it and overriding the answer. Omit to let the tool "
                         "settle the pressure; either way every property is "
                         "evaluated at the pressure that ends up being used")
+    p.add_argument("--out", help="also write the printed report to this file")
+    p.add_argument("--json", dest="json_path",
+                   help="write the whole run as structured data: the pressure "
+                        "and its basis, q and whether it was imposed, every "
+                        "rule fired or not, the equipment choices with their "
+                        "status, and every verification check. This is what "
+                        "makes two runs comparable rather than merely readable")
     p.add_argument("--explain", action="store_true",
                    help="also print rules that did not fire, with their values")
     p.add_argument("--design", action="store_true",
@@ -224,16 +231,36 @@ def main(argv: list[str] | None = None) -> int:
         print(f"sepsyn: {exc}", file=sys.stderr)
         return 2
 
+    printed: list[str] = []
+
+    def emit(text: str = "") -> None:
+        """Print and remember. --out must save what the user actually saw, not
+        a second rendering that could drift from it."""
+        printed.append(text)
+        print(text)
+
     record, verdicts, overall = screen(feed, args.light_key, args.heavy_key,
                                        column_P_Pa=args.column_P)
-    print(format_report(feed, record, verdicts, overall, explain=args.explain))
+    emit(format_report(feed, record, verdicts, overall, explain=args.explain))
+    designed = None
+
+    def save() -> None:
+        if args.out:
+            with open(args.out, "w") as fh:
+                fh.write("\n".join(printed).rstrip() + "\n")
+        if args.json_path:
+            from sepsyn.serialize import run_to_dict, write_json
+            write_json(args.json_path,
+                       run_to_dict(feed, record, verdicts, overall, designed))
 
     if args.design:
         if overall not in ("feasible", "caution"):
-            print(f"\nNot designing: screening returned {overall.upper()}.")
+            emit(f"\nNot designing: screening returned {overall.upper()}.")
+            save()
             return 0
         if not (args.light_key and args.heavy_key):
-            print("\n--design requires --light-key and --heavy-key")
+            emit("\n--design requires --light-key and --heavy-key")
+            save()
             return 2
         from sepsyn.report import format_design
         try:
@@ -245,10 +272,13 @@ def main(argv: list[str] | None = None) -> int:
                 feed_q=args.feed_q,
                 column_P_Pa=args.column_P)
         except ValueError as exc:
-            print(f"\nCannot design: {exc}")
+            emit(f"\nCannot design: {exc}")
+            save()
             return 2
-        print()
-        print(format_design(*out))
+        designed = out
+        emit()
+        emit(format_design(*out))
+    save()
     return 0
 
 

@@ -70,6 +70,38 @@ Design the column:
 Add `--explain` to print the rules that did **not** fire, with the values they
 tested. Flows are kmol/hr, temperatures K, pressures Pa.
 
+## Saving a run
+
+```bash
+--out results/run.txt     # the readable report
+--json results/run.json   # the same run as structured data
+```
+
+The JSON is what makes two runs *comparable* rather than merely readable, which
+is the argument the whole tool rests on. Three things in it are deliberately
+saved as pairs, because saving half of any of them recreates the
+unrecorded-assumption failure in a new file format:
+
+| Saved | Why both halves |
+|---|---|
+| pressure **and its basis** | specified and derived are different claims |
+| q **and whether it was imposed** | a q the feed had, and a q it was given, are different designs with the same number |
+| an equipment choice **and its status** | convention and evidence are not the same |
+
+Every rule is recorded, fired or not, along with all eight verification checks
+and the whole reflux sweep. So two designs line up directly:
+
+```
+                     as it arrives       preheated
+feed q                       1.301           1.000
+imposed?                     False            True
+stages                          44              48
+annualised USD/yr          329,276         291,331
+reboiler kW                 1400.7          1158.4
+
+  difference: $37,946/yr from one assumption
+```
+
 There is a guided demo:
 
 ```bash
