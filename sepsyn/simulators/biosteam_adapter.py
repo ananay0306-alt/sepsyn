@@ -74,6 +74,12 @@ class BioSteamSimulator:
 
     def design_column(self, feed: Feed, spec: ColumnSpec) -> ColumnResult:
         try:
+            if spec.condenser_type not in ("total", "partial"):
+                raise ValueError(
+                    f"condenser_type must be 'total' or 'partial', got "
+                    f"{spec.condenser_type!r}. Guessing here would hide the "
+                    f"choice, which is the one thing step 22 forbids."
+                )
             with contextlib.redirect_stdout(io.StringIO()):
                 bst, s = self._setup(feed)
                 feed_q = self._apply_and_measure_feed_q(s, feed, spec)
@@ -86,12 +92,14 @@ class BioSteamSimulator:
                     k=spec.reflux_over_minimum,
                     P=spec.pressure_Pa,
                     is_divided=False,
-                    # Stated, not inherited. BinaryDistillation defaults to a
-                    # PARTIAL condenser, which condenses only the reflux and so
-                    # does roughly R/(R+1) of the duty and hands back a vapour
-                    # distillate. A liquid product is the normal default and
-                    # the one every downstream cost and comparison assumes.
-                    partial_condenser=False,
+                    # Taken from the SPEC, not inherited and not hardcoded.
+                    # BinaryDistillation defaults to a PARTIAL condenser, which
+                    # condenses only the reflux and so does roughly R/(R+1) of
+                    # the duty and hands back a vapour distillate. A liquid
+                    # product is the normal default and the one every
+                    # downstream cost and comparison assumes -- but it is now a
+                    # recorded decision (step 22) rather than a constant.
+                    partial_condenser=(spec.condenser_type == "partial"),
                 )
                 col.simulate()
                 D, B = col.outs
@@ -125,6 +133,9 @@ class BioSteamSimulator:
                     distillate_T_K=float(D.T),
                     bottoms_T_K=float(B.T),
                     feed_H_kW=float(s.H) / 3600.0,
+                    # BioSTEAM reports Diameter in FEET.
+                    column_diameter_m=float(d.get("Diameter", 0.0)) * 0.3048
+                    or None,
                     feed_q=feed_q,
                     distillate_H_kW=float(D.H) / 3600.0,
                     bottoms_H_kW=float(B.H) / 3600.0,

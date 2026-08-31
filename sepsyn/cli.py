@@ -56,6 +56,8 @@ def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
 
     from sepsyn.design import (best_point, choose_pressure, recoveries_for_purity,
                                sweep_reflux)
+    from sepsyn.equipment import DesignContext, choose_equipment
+    from sepsyn.properties import condensing_temperature, count_supercritical
     from sepsyn.simulators.base import ColumnResult, ColumnSpec
     from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
     from sepsyn.verify import verify_column
@@ -69,9 +71,41 @@ def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
             feed, light_key, heavy_key, distillate_purity, bottoms_impurity)
 
     pressure, _note = choose_pressure(feed, light_key)
+
+    # Equipment choices are settled in TWO passes, and the split is forced by
+    # the physics rather than chosen for tidiness. Step 22 must be decided
+    # BEFORE the column is built, because the adapter needs the condenser type
+    # to build it. Step 24 cannot be decided until AFTER, because it keys on a
+    # diameter that does not exist until the column has been sized.
+    n_super = count_supercritical(feed)
+    bottoms_T = condensing_temperature(heavy_key, pressure)
+    before = DesignContext(pressure_Pa=pressure, n_supercritical_at_feed=n_super,
+                           bottoms_T_at_column_P=bottoms_T, feed_q=feed_q)
+    condenser = next(d for d in choose_equipment(before) if d.step == 22)
+
     spec = ColumnSpec(light_key, heavy_key, lk_recovery, hk_recovery, pressure,
+                      condenser_type=condenser.choice or "total",
                       feed_q=feed_q)
     sim = BioSteamSimulator()
+
+    def equipment_record(result) -> list:
+        """The decisions as they stand once the column is sized.
+
+        Step 22 is deliberately carried over from the pre-design pass rather
+        than recomputed. That decision is what BOUND the simulation, and a
+        record that recomputes it could describe a condenser the column never
+        had -- which is the 58 percent discrepancy, rebuilt.
+        """
+        after = DesignContext(
+            pressure_Pa=pressure, n_supercritical_at_feed=n_super,
+            bottoms_T_at_column_P=bottoms_T,
+            feed_q=result.feed_q if result is not None else feed_q,
+            stages=result.stages if result is not None else None,
+            column_diameter_m=(result.column_diameter_m
+                               if result is not None else None),
+        )
+        return [condenser if d.step == 22 else d
+                for d in choose_equipment(after)]
 
     # Anything that is neither key has no specification constraining it.
     unseparated = [n for n in feed.names if n not in (light_key, heavy_key)]
@@ -85,12 +119,14 @@ def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
         why = "; ".join(f"k={p.k}: {p.error}" for p in points if not p.converged)
         failed = ColumnResult({}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, False,
                               error=f"no reflux multiple produced a design. {why}")
-        return spec, points, None, failed, verify_column(feed, spec, failed), unseparated
+        return (spec, points, None, failed, verify_column(feed, spec, failed),
+                unseparated, equipment_record(failed))
 
     spec = replace(spec, reflux_over_minimum=best.k)
     result = sim.design_column(feed, spec)
     checks = verify_column(feed, spec, result)
-    return spec, points, best, result, checks, unseparated
+    return (spec, points, best, result, checks, unseparated,
+            equipment_record(result))
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -28,6 +28,15 @@ class ColumnSpec:
     hk_recovery_to_bottoms: float
     pressure_Pa: float
     reflux_over_minimum: float = 1.2
+    condenser_type: str = "total"
+    """"total" or "partial". Heuristic step 22.
+
+    Carried on the SPEC, not left to the adapter, because this is the choice
+    that produced the project's 58 percent condenser-duty discrepancy: a
+    partial condenser does roughly R/(R+1) of the duty of a total one and hands
+    back a vapour distillate. An equipment rule that recommends a condenser
+    while the adapter hardcodes a different one reproduces that failure with
+    better documentation attached."""
     feed_q: float | None = None
     """Feed thermal condition to impose, at the column pressure. Heuristic
     steps 15 and 16.
@@ -70,6 +79,11 @@ class ColumnResult:
     feed_H_kW: float | None = None
     distillate_H_kW: float | None = None
     bottoms_H_kW: float | None = None
+    column_diameter_m: float | None = None
+    """Column diameter in METRES. BioSTEAM reports it in feet; the conversion
+    happens in the adapter so no rule ever sees a foot. The internals rule
+    keys on 0.6 m, and 3.8 ft read as metres would make its small-diameter
+    branch unreachable for every column ever designed."""
     feed_q: float | None = None
     """The feed thermal condition this design ACTUALLY ran at, measured at the
     column pressure. Heuristic step 17.

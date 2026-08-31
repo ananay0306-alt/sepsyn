@@ -1,0 +1,139 @@
+# Equipment choices. Heuristic steps 22 to 25.
+#
+# NOT screening rules. These do not feed overall_verdict -- a preference for
+# packing must never outrank a feasibility finding. See equipment.py.
+#
+# Each decision carries the options it is choosing between, a stated default
+# for when no rule fires, and what must be recorded either way. A rule may
+# choose `null`, which means "this decision cannot be made from what sepsyn
+# knows"; such a rule MUST name what would settle it, exactly as an
+# `undetermined` screening rule must.
+#
+# Conditions may reference ONLY the fields of DesignContext.as_namespace().
+# Comparisons against None are False, so a missing number never fires a rule.
+
+- step: 22
+  decision: condenser_type
+  question: total or partial condenser
+  options: [total, partial]
+  must_record: >-
+    which condenser was used. This is the single most expensive omission in the
+    project's evidence: an unrecorded condenser type produced a 58 percent
+    condenser-duty discrepancy between two calculations that were each correct.
+    A partial condenser does roughly R/(R+1) of the duty of a total one and
+    hands back a vapour distillate.
+  default:
+    choice: total
+    because: >-
+      a total condenser gives a liquid distillate and is the usual default,
+      which is what every downstream cost correlation and product
+      specification here assumes
+    cite: "Seader & Henley, Separation Process Principles, Ch.7"
+  rules:
+    - id: E-22a
+      priority: 10
+      when: "n_supercritical_at_feed > 0"
+      choice: partial
+      because: >-
+        a component that cannot be condensed at feed conditions will not
+        condense in the overhead either; a total condenser would either fail to
+        condense or need refrigeration, so the light material leaves as vapour
+      cite: "Towler & Sinnott, Chemical Engineering Design, Ch.17"
+      limitations: >-
+        this reads the supercritical count at FEED conditions, and the
+        condenser runs at the overhead composition and the column pressure.
+        Raising the pressure can bring a marginal component back into the
+        liquid, which would restore the total condenser
+
+- step: 23
+  decision: reboiler_type
+  question: kettle, thermosiphon, or forced circulation
+  options: [kettle, thermosiphon, forced_circulation]
+  must_record: >-
+    which reboiler was used and on what basis. The type sets the vapour
+    fraction leaving the reboiler and the residence time of the bottoms, and
+    both change the duty and the fouling behaviour.
+  default:
+    choice: kettle
+    because: >-
+      a kettle suits a clean service and a large vapour fraction, and is the
+      usual default where nothing is known against it
+    cite: "Towler & Sinnott, Chemical Engineering Design, Ch.19"
+  rules:
+    - id: E-23a
+      priority: 10
+      when: "bottoms_T_at_column_P > 473.15"
+      choice: null
+      because: >-
+        above about 200 C the bottoms is where fouling, polymerisation and
+        coking appear, and those are exactly the conditions that rule out a
+        kettle in favour of forced circulation. Which one applies cannot be
+        decided from a boiling point
+      cite: "Towler & Sinnott, Chemical Engineering Design, Ch.19"
+      requires:
+        - >-
+          liquid viscosity of the bottoms at the reboiler temperature, and
+          whether the bottoms fouls or carries solids. Neither is in the
+          property database; both come from a data sheet or from plant
+          experience. Above roughly 20 cP, or with any solids, forced
+          circulation is the answer and a kettle is not
+      limitations: >-
+        this fires on temperature alone, which is a proxy and not a
+        measurement. A thermally robust, clean, low-viscosity bottoms at 250 C
+        is a perfectly good kettle service and this rule is then simply
+        dismissed
+
+- step: 24
+  decision: internals
+  question: trays or packing
+  options: [trays, packing]
+  must_record: >-
+    trays or packing, and for trays the stage efficiency assumed. A theoretical
+    stage count compared against an actual tray count without the efficiency
+    stated is the second discrepancy this project measured, at 43 percent.
+  default:
+    choice: trays
+    because: >-
+      trays suit higher pressure, large diameter, fouling service, and any duty
+      where liquid residence time is wanted; they are the usual default at or
+      above atmospheric pressure
+    cite: "Towler & Sinnott, Chemical Engineering Design, Ch.17"
+  rules:
+    - id: E-24a
+      priority: 10
+      when: "pressure_Pa < 101325"
+      choice: packing
+      because: >-
+        under vacuum the pressure drop per stage is a significant fraction of
+        the absolute pressure, so it moves the bottoms temperature and the
+        equilibrium with it; packing has a far lower pressure drop per
+        theoretical stage than trays
+      cite: "Towler & Sinnott, Chemical Engineering Design, Ch.17"
+      limitations: >-
+        the column pressure drop is roughly 0.1 psi per tray, so this rule
+        matters most at deep vacuum and hardly at all just below atmospheric
+    - id: E-24b
+      priority: 20
+      when: "column_diameter_m < 0.6"
+      choice: packing
+      because: >-
+        below roughly 0.6 m a tray cannot be installed or maintained through a
+        manway, and packing is both cheaper and mechanically simpler at that
+        size
+      cite: "Towler & Sinnott, Chemical Engineering Design, Ch.17"
+
+- step: 25
+  decision: reflux_thermal_state
+  question: saturated or subcooled reflux
+  options: [saturated, subcooled]
+  must_record: >-
+    the reflux thermal state, and if subcooled, by how much. Subcooled reflux
+    raises the internal reflux above the measured external reflux and raises
+    the condenser duty with it, so a design compared at equal external reflux
+    is not being compared at equal separation.
+  default:
+    choice: saturated
+    because: >-
+      saturated reflux is the normal assumption and the one the shortcut
+      methods used here are derived under
+    cite: "Wankat, Separation Process Engineering, Ch.4"

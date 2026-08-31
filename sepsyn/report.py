@@ -1,5 +1,7 @@
 """Formatting. The output IS the product -- the whole point is that a reader
 can check the reasoning, so rules that did NOT fire are printed too."""
+import textwrap
+
 from sepsyn.properties import boiling_point, critical_temperature, resolve
 from sepsyn.types import Feed, PropertyRecord
 from sepsyn.engine import Verdict
@@ -112,7 +114,41 @@ def _feed_condition_line(spec, result) -> str:
     return f"q = {result.feed_q:.3f} ({describe(result.feed_q)}, {origin})"
 
 
-def format_design(spec, points, best, result, checks, unseparated) -> str:
+def _format_equipment(decisions) -> list[str]:
+    """Steps 22 to 25, with the STATUS of each choice kept visible.
+
+    "total condenser, decided" and "total condenser, by default" are different
+    claims about how much is known, and a report that prints them identically
+    hands the reader a design they cannot compare with anyone else's. That is
+    the failure that produced this project's 58 percent condenser-duty
+    discrepancy, so the label is not decoration.
+    """
+    lines = ["", "EQUIPMENT CHOICES"]
+    for d in decisions:
+        if d.status == "open":
+            headline = f"NOT DECIDED ({' / '.join(d.options)})"
+        else:
+            suffix = "by default" if d.status == "default" else f"decided, {d.rule_id}"
+            headline = f"{d.choice}  [{suffix}]"
+        lines.append(f"  step {d.step}  {d.question}")
+        lines.append(f"            {headline}")
+        lines.extend(_wrapped("            ", d.because))
+        for item in d.requires:
+            lines.extend(_wrapped("            needs: ", item))
+        if d.limitations:
+            lines.extend(_wrapped("            but: ", d.limitations))
+        lines.extend(_wrapped("            must record: ", d.must_record))
+    return lines
+
+
+def _wrapped(prefix: str, text: str) -> list[str]:
+    body = textwrap.wrap(" ".join(text.split()), width=78 - len(prefix)) or [""]
+    pad = " " * len(prefix)
+    return [prefix + body[0]] + [pad + line for line in body[1:]]
+
+
+def format_design(spec, points, best, result, checks, unseparated,
+                  equipment=None) -> str:
     """The design half of the report. Same contract as the screening half: show
     the numbers that decided it, and say plainly what was not decided."""
     lines: list[str] = []
@@ -146,6 +182,10 @@ def format_design(spec, points, best, result, checks, unseparated) -> str:
                 f"{b:>12.3f} bottoms ({b/b_total:>7.3%})" if d_total and b_total
                 else f"  {name:<12}{d:>10.3f} overhead{b:>12.3f} bottoms"
             )
+        lines.append("")
+
+    if equipment:
+        lines.extend(_format_equipment(equipment))
         lines.append("")
 
     lines.append("VERIFICATION")
