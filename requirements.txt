@@ -1,0 +1,14 @@
+# Pinned to the versions every measurement in STATUS.md and the README was made
+# against. Two of them matter more than usual: the liquid-liquid false positive
+# and the 0.914 m diameter clamp are properties of these specific releases, and
+# tests/test_diameter_floor.py will fail loudly if BioSTEAM changes its bound.
+biosteam==2.53.11
+thermosteam==0.53.5
+chemicals==1.5.2
+numpy==2.5.2
+PyYAML==6.0.3
+
+# The test suite is not optional here. Several tests encode a measured finding
+# rather than an expected value, and they are the record of why the code looks
+# the way it does.
+pytest==9.1.1

@@ -5,7 +5,19 @@
 #   NOPAUSE=1 ./demo.sh    run straight through
 set -u
 cd "$(dirname "$0")"
-PY=../.venv/bin/python
+
+# Find an interpreter rather than assuming one. A clone puts .venv inside the
+# repo; the original working copy has it one level up, outside the repo root.
+if   [ -n "${PY:-}" ];            then :
+elif [ -x .venv/bin/python ];     then PY=.venv/bin/python
+elif [ -x ../.venv/bin/python ];  then PY=../.venv/bin/python
+else PY=python3
+fi
+if ! "$PY" -c "import biosteam" 2>/dev/null; then
+  echo "sepsyn: $PY cannot import biosteam."
+  echo "  python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+  exit 1
+fi
 
 b()  { printf '\n\033[1;36m%s\033[0m\n\033[2m%s\033[0m\n\n' "$1" "$2"; }
 say() { printf '\033[1;33m>> %s\033[0m\n' "$1"; }
