@@ -94,6 +94,24 @@ def format_report(
     return "\n".join(lines)
 
 
+def _feed_condition_line(spec, result) -> str:
+    """Heuristic step 17. q printed WITH the design, every time.
+
+    Three distinct things have to stay distinguishable here, and collapsing any
+    two of them is the failure the step exists to prevent: a q that was imposed
+    on the feed, a q the feed simply had, and a q that could not be measured at
+    all. The third is not zero -- zero is a saturated vapour.
+    """
+    from sepsyn.feed_condition import describe
+
+    if result is None or result.feed_q is None:
+        return ("thermal condition q could not be measured at this pressure "
+                "(no vapour/liquid region), so this design is not comparable "
+                "with one at a stated q")
+    origin = "imposed" if spec.feed_q is not None else "as it arrives"
+    return f"q = {result.feed_q:.3f} ({describe(result.feed_q)}, {origin})"
+
+
 def format_design(spec, points, best, result, checks, unseparated) -> str:
     """The design half of the report. Same contract as the screening half: show
     the numbers that decided it, and say plainly what was not decided."""
@@ -103,6 +121,7 @@ def format_design(spec, points, best, result, checks, unseparated) -> str:
     lines.append(f"  pressure    {spec.pressure_Pa/1e5:.3f} bar")
     lines.append(f"  recovery    {spec.light_key} {spec.lk_recovery_to_distillate:.3%} "
                  f"overhead, {spec.heavy_key} {spec.hk_recovery_to_bottoms:.3%} bottoms")
+    lines.append(f"  feed        {_feed_condition_line(spec, result)}")
     lines.append("")
     lines.append("REFLUX SWEEP")
     lines.append(f"  {'k':>6}{'stages':>9}{'annualised $/yr':>19}")

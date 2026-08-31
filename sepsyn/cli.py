@@ -40,7 +40,8 @@ def screen(feed: Feed, light_key: str | None = None,
 def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
                        lk_recovery: float = 0.99, hk_recovery: float = 0.99,
                        distillate_purity: float | None = None,
-                       bottoms_impurity: float | None = None):
+                       bottoms_impurity: float | None = None,
+                       feed_q: float | None = None):
     """Design the column and report what the specification did NOT cover.
 
     Recoveries may be given directly, or TOTAL-stream purities may be given and
@@ -68,7 +69,8 @@ def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
             feed, light_key, heavy_key, distillate_purity, bottoms_impurity)
 
     pressure, _note = choose_pressure(feed, light_key)
-    spec = ColumnSpec(light_key, heavy_key, lk_recovery, hk_recovery, pressure)
+    spec = ColumnSpec(light_key, heavy_key, lk_recovery, hk_recovery, pressure,
+                      feed_q=feed_q)
     sim = BioSteamSimulator()
 
     # Anything that is neither key has no specification constraining it.
@@ -114,6 +116,12 @@ def main(argv: list[str] | None = None) -> int:
                         "converted to recoveries, use with --bottoms-impurity")
     p.add_argument("--bottoms-impurity", type=float,
                    help="light key mole fraction of the TOTAL bottoms")
+    p.add_argument("--feed-q", type=float,
+                   help="impose the feed thermal condition at the column "
+                        "pressure: 1 saturated liquid, 0 saturated vapour, "
+                        ">1 subcooled, <0 superheated. Omit to take the feed "
+                        "as it arrives -- omitting is NOT the same as 1.0, "
+                        "and either way the q used is reported")
     args = p.parse_args(argv)
 
     try:
@@ -140,7 +148,8 @@ def main(argv: list[str] | None = None) -> int:
                 feed, args.light_key, args.heavy_key,
                 args.lk_recovery, args.hk_recovery,
                 distillate_purity=args.distillate_purity,
-                bottoms_impurity=args.bottoms_impurity)
+                bottoms_impurity=args.bottoms_impurity,
+                feed_q=args.feed_q)
         except ValueError as exc:
             print(f"\nCannot design: {exc}")
             return 2

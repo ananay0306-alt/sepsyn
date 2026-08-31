@@ -28,6 +28,19 @@ class ColumnSpec:
     hk_recovery_to_bottoms: float
     pressure_Pa: float
     reflux_over_minimum: float = 1.2
+    feed_q: float | None = None
+    """Feed thermal condition to impose, at the column pressure. Heuristic
+    steps 15 and 16.
+
+    None means TAKE THE FEED AS IT ARRIVES -- it is not a default of 1.0. That
+    distinction matters: every design sepsyn made before this field existed
+    used the arriving condition, and quietly asserting a saturated liquid here
+    would change all of them while looking like a no-op.
+
+    A number imposes the condition, which is step 16's preheat-or-not decision
+    made explicit: 1.0 a saturated liquid, 0.0 a saturated vapour, above 1
+    subcooled, below 0 superheated. The duty needed to get there is a feed
+    heater or cooler that this tool does not yet cost."""
 
 
 @dataclass(frozen=True)
@@ -57,6 +70,15 @@ class ColumnResult:
     feed_H_kW: float | None = None
     distillate_H_kW: float | None = None
     bottoms_H_kW: float | None = None
+    feed_q: float | None = None
+    """The feed thermal condition this design ACTUALLY ran at, measured at the
+    column pressure. Heuristic step 17.
+
+    Recorded on the result and not only in the printed report, because two
+    designs at different q are not comparable and a q that cannot be asserted
+    on is a q that will go unchecked. None means it could not be measured (no
+    VLE region at this pressure), never that the feed was a saturated
+    vapour -- that is q = 0.0."""
 
 
 @dataclass(frozen=True)

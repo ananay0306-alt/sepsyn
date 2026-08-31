@@ -9,6 +9,7 @@ import dataclasses
 import io
 import warnings
 
+from sepsyn.feed_condition import saturation_endpoints
 from sepsyn.simulators.base import (
     ColumnResult,
     ColumnSpec,
@@ -50,10 +51,32 @@ class BioSteamSimulator:
             s.imol[c.name] = c.flow_kmol_hr
         return bst, s
 
+    def _apply_and_measure_feed_q(self, s, feed: Feed,
+                                  spec: ColumnSpec) -> float | None:
+        """Impose spec.feed_q if one was asked for, and report the q the column
+        actually sees. Heuristic steps 15 to 17.
+
+        The asymmetry is deliberate. When spec.feed_q is None the stream is left
+        exactly as it arrived and only MEASURED -- because that is what every
+        design before this field existed already did, and silently flashing the
+        feed here would change all of their numbers under the cover of adding a
+        record. Only an explicit q moves the feed.
+        """
+        ends = saturation_endpoints(feed, spec.pressure_Pa)
+        if ends is None:
+            # No VLE region at this pressure, so there is nothing to measure q
+            # against. None, not 0.0 -- 0.0 is the claim "saturated vapour".
+            return None
+        if spec.feed_q is not None:
+            s.vle(P=spec.pressure_Pa, H=ends.enthalpy_at_q(spec.feed_q))
+            return spec.feed_q
+        return ends.q_of(float(s.H))
+
     def design_column(self, feed: Feed, spec: ColumnSpec) -> ColumnResult:
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 bst, s = self._setup(feed)
+                feed_q = self._apply_and_measure_feed_q(s, feed, spec)
                 col = bst.BinaryDistillation(
                     "C1", ins=s, outs=("D", "B"),
                     LHK=(spec.light_key, spec.heavy_key),
@@ -102,6 +125,7 @@ class BioSteamSimulator:
                     distillate_T_K=float(D.T),
                     bottoms_T_K=float(B.T),
                     feed_H_kW=float(s.H) / 3600.0,
+                    feed_q=feed_q,
                     distillate_H_kW=float(D.H) / 3600.0,
                     bottoms_H_kW=float(B.H) / 3600.0,
                 )
