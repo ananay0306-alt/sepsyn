@@ -121,6 +121,17 @@
         manway, and packing is both cheaper and mechanically simpler at that
         size
       cite: "Towler & Sinnott, Chemical Engineering Design, Ch.17"
+      limitations: >-
+        UNREACHABLE through the BioSTEAM adapter, measured. BioSTEAM bounds
+        column diameter to 3 to 24 ft and the lower bound is a hard clamp: feed
+        rates of 0.01 and 1 kmol/hr both return exactly 3.00 ft, which is
+        0.914 m, so no column BioSTEAM designs can enter this branch. The
+        threshold is deliberately NOT raised to meet that floor, because 0.6 m
+        is a physical criterion about manway access and the floor is an
+        artefact of one simulator; the rule must still be right when a DWSIM
+        adapter or a hand-built context supplies a real small diameter. Pinned
+        by tests/test_diameter_floor.py so the day BioSTEAM lowers its bound
+        does not pass unnoticed
 
 - step: 25
   decision: reflux_thermal_state
