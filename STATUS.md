@@ -8,7 +8,7 @@ Updated 2026-08-30 (late evening). Check this file; it is the tracker.
 | | |
 |---|---|
 | Milestones done | **1 of 6**, plus the 41-step heuristics fold-in COMPLETE |
-| Tests | **216 passing**, 17 s |
+| Tests | **223 passing**, 17 s |
 | Blocking right now | **Risk 5**, re-tested and confirmed genuine. M2 needs a new acceptance case |
 | Waiting on you | **3 decisions** (below). M2 does not move until these are made. |
 
@@ -126,7 +126,8 @@ omission rather than a decision, so both were built.
 | the condenser type was a hardcoded constant in the adapter while the rules recommended one | equipment | moved onto ColumnSpec and decided BEFORE the column is built; the record and the run can no longer disagree |
 | BioSTEAM reports Diameter in FEET | equipment | 3.8 read as metres would make the small-diameter branch unreachable for every column ever designed. Converted in the adapter, pinned by a test |
 | thermosteam's LLE returns two phases of IDENTICAL composition for a miscible mixture | lle | detecting on phase AMOUNTS reported ethanol/water as splitting. Criterion is composition DIFFERENCE |
-| **E-24b (packing below 0.6 m) is UNREACHABLE via BioSTEAM** | equipment | BioSTEAM hard-clamps diameter at 3 ft = 0.914 m. Threshold NOT raised to meet the floor — 0.6 m is physics, the floor is one simulator's artefact. Documented in the rule and pinned by `test_diameter_floor.py` |
+| **E-24b (packing below 0.6 m) was UNREACHABLE via BioSTEAM — now FIXED** | equipment | BioSTEAM hard-clamps diameter at 0.914 m inside `compute_tower_diameter`. The adapter now recomputes the true hydraulic diameter from BioSTEAM's own correlations, both sections, and carries the floored value separately as `biosteam_reported_diameter_m` since the COST belongs to that one |
+| BioSTEAM converts m to ft with **3.28**, not 3.280839895 | adapter | converting back with 0.3048 does not round-trip and lands 0.026 % low. Small, but it was the whole gap between the recomputed and reported diameters, and would have read as an error in the correlation rather than the unit |
 | **UNIFAC predicts a FALSE miscibility gap for water/glycerol** | lle | not fixable by any threshold — it is indistinguishable from a true split by width, point count and dx alike. See below |
 
 #### The water/glycerol false positive, and what was done about it

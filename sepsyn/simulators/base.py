@@ -79,11 +79,22 @@ class ColumnResult:
     feed_H_kW: float | None = None
     distillate_H_kW: float | None = None
     bottoms_H_kW: float | None = None
+    biosteam_reported_diameter_m: float | None = None
+    """The diameter BioSTEAM actually designed and COSTED the column at, in
+    metres. Kept alongside column_diameter_m because BioSTEAM floors the
+    diameter at 0.914 m and then sizes the shell, wall and cost from that
+    floored value -- so the cost belongs to this number, while the equipment
+    rules need the other one. Neither may be silently substituted for the
+    other."""
     column_diameter_m: float | None = None
     """Column diameter in METRES. BioSTEAM reports it in feet; the conversion
     happens in the adapter so no rule ever sees a foot. The internals rule
     keys on 0.6 m, and 3.8 ft read as metres would make its small-diameter
-    branch unreachable for every column ever designed."""
+    branch unreachable for every column ever designed.
+
+    This is the TRUE hydraulic diameter, recovered from under BioSTEAM's
+    0.914 m floor -- see _hydraulic_diameter_m in the adapter. Above the floor
+    it equals biosteam_reported_diameter_m exactly."""
     feed_q: float | None = None
     """The feed thermal condition this design ACTUALLY ran at, measured at the
     column pressure. Heuristic step 17.

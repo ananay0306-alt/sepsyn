@@ -21,6 +21,81 @@ from sepsyn.types import Feed
 warnings.filterwarnings("ignore")
 
 _EMPTY_COLUMN = ColumnResult({}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, False)
+
+# BioSTEAM's OWN metres-to-feet constant, not the exact 3.280839895.
+#
+# distillation.py stores Diameter and Height as `metres * 3.28`. Dividing by
+# that same 3.28 recovers the metre value BioSTEAM actually designed with;
+# multiplying by the exact 0.3048 does NOT round-trip and lands 0.026 percent
+# low -- which is small, but it is the entire difference between the recomputed
+# diameter and the reported one, and it would have been read as an error in the
+# correlation rather than in the unit conversion.
+BIOSTEAM_FT_PER_M = 3.28
+
+def _section_diameter_m(design, TS, L, V, V_vol, rho_V, rho_L, sigma,
+                        F_F, A_ha, A_dn, f) -> float:
+    """One section's diameter WITHOUT BioSTEAM's floor.
+
+    Identical to biosteam's compute_tower_diameter except for the two lines it
+    ends with:
+
+        if Di < 0.914: Di = 0.914   # "Make sure diameter is not too small"
+
+    Everything above those lines is BioSTEAM's own correlation chain, called
+    here rather than reimplemented, so this cannot drift from it numerically.
+    """
+    import math
+
+    F_LV = design.compute_flow_parameter(L, V, rho_V, rho_L)
+    C_sbf = design.compute_max_capacity_parameter(TS, F_LV)
+    U_f = design.compute_max_vapor_velocity(C_sbf, sigma, rho_L, rho_V,
+                                            F_F, A_ha)
+    if A_dn is None:
+        A_dn = design.compute_downcomer_area_fraction(F_LV)
+    return math.sqrt(4.0 * V_vol / (f * U_f * math.pi * (1.0 - A_dn)))
+
+
+def _hydraulic_diameter_m(col) -> float:
+    """True diameter of the column, the larger of its two sections.
+
+    BOTH sections, and that is not optional. On a 100 kmol/hr benzene/toluene
+    column the rectifying section gives 1.086 m and the stripping section
+    1.151 m, so a rectifying-only version under-reports by 6 percent and would
+    call for packing on columns that want trays. It passes every small-column
+    test while doing so, which is exactly why the agreement test above the
+    floor is the one that matters.
+
+    Reads five private BioSTEAM attributes (_TS, _f, _F_F, _A_ha, _A_dn). The
+    caller treats any failure here as "unknown" and falls back to the reported
+    diameter, because a design is worth more than a diameter.
+    """
+    from biosteam.units.design_tools import column_design as design
+
+    TS, f, F_F, A_ha, A_dn = col._TS, col._f, col._F_F, col._A_ha, col._A_dn
+    R = float(col.design_results["Reflux"])
+
+    # Rectifying section, at the top plate.
+    condensate = col.condensate
+    sigma = condensate.get_property("sigma", "dyn/cm")
+    L_top = condensate.F_mass
+    vapor_top = col.condenser.ins[0]
+    rectifying = _section_diameter_m(
+        design, TS, L_top, L_top * (R + 1.0) / R,
+        vapor_top.get_total_flow("m^3/s"), vapor_top.rho, condensate.rho,
+        sigma, F_F, A_ha, A_dn, f)
+
+    # Stripping section, at the feed plate. BioSTEAM uses the CONDENSATE's
+    # surface tension here too, not the bottoms'; replicated deliberately so
+    # the two agree above the floor rather than "improved" into disagreement.
+    bottoms = col.outs[1]
+    boilup = col.reboiler.outs[0]["g"]
+    stripping = _section_diameter_m(
+        design, TS, bottoms.F_mass, boilup.F_mass,
+        boilup.get_total_flow("m^3/s"), boilup.rho, bottoms.rho,
+        sigma, F_F, A_ha, A_dn, f)
+
+    return max(rectifying, stripping)
+
 _EMPTY_FLASH = FlashResult({}, {}, 0.0, 0.0, False)
 
 
@@ -133,9 +208,13 @@ class BioSteamSimulator:
                     distillate_T_K=float(D.T),
                     bottoms_T_K=float(B.T),
                     feed_H_kW=float(s.H) / 3600.0,
-                    # BioSTEAM reports Diameter in FEET.
-                    column_diameter_m=float(d.get("Diameter", 0.0)) * 0.3048
-                    or None,
+                    # BioSTEAM reports Diameter in FEET, and floors it at
+                    # 0.914 m. The rules need the unfloored value; the cost
+                    # belongs to the floored one, so both are carried.
+                    biosteam_reported_diameter_m=(
+                        float(d.get("Diameter", 0.0)) / BIOSTEAM_FT_PER_M
+                        or None),
+                    column_diameter_m=_true_diameter_m(col, d),
                     feed_q=feed_q,
                     distillate_H_kW=float(D.H) / 3600.0,
                     bottoms_H_kW=float(B.H) / 3600.0,
@@ -176,3 +255,18 @@ class BioSteamSimulator:
             return dataclasses.replace(
                 _EMPTY_FLASH, error=f"{type(exc).__name__}: {exc}"
             )
+
+
+def _true_diameter_m(col, design_results) -> float | None:
+    """Unfloored diameter, or the reported one if it cannot be recovered.
+
+    Degrading rather than raising is deliberate: this reads private BioSTEAM
+    attributes, and a version bump that moves them must cost a diameter, not a
+    design.
+    """
+    floored = (float(design_results.get("Diameter", 0.0))
+               / BIOSTEAM_FT_PER_M or None)
+    try:
+        return _hydraulic_diameter_m(col)
+    except Exception:
+        return floored

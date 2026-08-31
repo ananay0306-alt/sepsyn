@@ -1,66 +1,69 @@
-"""BioSTEAM's diameter floor, and what it does to rule E-24b.
+"""BioSTEAM's diameter floor, and the fact that sepsyn now sees through it.
 
-A CHARACTERISATION test: it pins third-party behaviour that sepsyn's rules
-depend on, rather than driving sepsyn code. Its job is to fail loudly the day
-BioSTEAM changes, because on that day a rule that is currently unreachable
-becomes live and nobody would otherwise notice.
+A CHARACTERISATION test of third-party behaviour sepsyn's rules depend on. Its
+job is to fail loudly if BioSTEAM changes, because the recompute in the adapter
+is written against this exact behaviour.
 """
+import pytest
+
 from sepsyn.equipment import DesignContext, choose_equipment
 from sepsyn.simulators.base import ColumnSpec
 from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
 from sepsyn.types import Component, Feed
 
 ATM = 101325.0
-BIOSTEAM_DIAMETER_FLOOR_M = 3.0 * 0.3048  # 0.9144 m; distillation.py _bounds
+BIOSTEAM_DIAMETER_FLOOR_M = 0.914  # hardcoded in compute_tower_diameter
 
 
 def tiny_column():
-    """A hundredth of a kmol/hr. Nothing physical needs a 3 ft column here."""
+    """A hundredth of a kmol/hr. Nothing here needs a 3 ft column."""
     return Feed(components=(Component("Benzene", "71-43-2", 0.006),
                             Component("Toluene", "108-88-3", 0.004)),
                 T_K=298.15, P_Pa=ATM)
 
 
-def test_biosteam_never_reports_a_diameter_below_three_feet():
-    """Measured across a 500,000-fold range of feed rates: 0.01 and 1 kmol/hr
-    both give exactly 3.00 ft, 100 gives 3.78, 5000 gives 26.70. The lower
-    bound is a hard clamp; the upper one is not (26.70 exceeds the stated 24)."""
-    sim = BioSteamSimulator()
-    r = sim.design_column(tiny_column(),
-                          ColumnSpec("Benzene", "Toluene", 0.99, 0.99, ATM))
-    assert r.converged, r.error
-    assert r.column_diameter_m >= BIOSTEAM_DIAMETER_FLOOR_M - 1e-3
+@pytest.fixture(scope="module")
+def result():
+    return BioSteamSimulator().design_column(
+        tiny_column(), ColumnSpec("Benzene", "Toluene", 0.99, 0.99, ATM))
 
 
-def test_E24b_is_therefore_UNREACHABLE_through_the_biosteam_adapter():
-    """The consequence, stated as an assertion so it cannot rot silently.
+def test_biosteam_still_floors_the_diameter_it_designs_with(result):
+    """Unchanged and still true: compute_tower_diameter ends with
+    `if Di < 0.914: Di = 0.914`. The shell, wall thickness and cost all follow
+    from the floored value, so it is the number the COST belongs to."""
+    assert result.converged, result.error
+    assert result.biosteam_reported_diameter_m == pytest.approx(
+        BIOSTEAM_DIAMETER_FLOOR_M, abs=1e-3)
 
-    E-24b chooses packing below 0.6 m, which is correct physics -- a tray
-    cannot be installed or maintained through a manway at that size. But
-    BioSTEAM floors the diameter at 0.914 m, so no column it designs can ever
-    reach the branch.
 
-    The threshold is deliberately NOT tuned up to meet the floor: that would
-    replace a physical criterion with an artefact of one simulator, and the
-    rule must still be correct when a DWSIM adapter or a hand-built context
-    supplies a real small diameter. If this test ever fails, BioSTEAM has
-    lowered its bound and the rule has come alive -- which is good news, and
-    worth knowing.
+def test_sepsyn_recovers_the_diameter_underneath_it(result):
+    """0.01 kmol/hr of benzene/toluene is a centimetre-scale column, and the
+    rules are entitled to know that even though BioSTEAM will not cost one."""
+    assert result.column_diameter_m < 0.1
+    assert result.column_diameter_m < result.biosteam_reported_diameter_m
+
+
+def test_E24b_now_fires_where_it_previously_could_not(result):
+    """This assertion is the inverse of the one it replaces.
+
+    E-24b chooses packing below 0.6 m -- correct physics, a tray cannot be
+    installed or maintained through a manway at that size. While the adapter
+    reported BioSTEAM's floored 0.914 m, no column it designed could reach the
+    branch and the rule was dead. It is now reachable.
     """
-    sim = BioSteamSimulator()
-    r = sim.design_column(tiny_column(),
-                          ColumnSpec("Benzene", "Toluene", 0.99, 0.99, ATM))
     decision = next(d for d in choose_equipment(DesignContext(
         pressure_Pa=ATM, n_supercritical_at_feed=0,
-        column_diameter_m=r.column_diameter_m)) if d.step == 24)
-    assert decision.choice == "trays"
-    assert decision.rule_id != "E-24b"
-
-
-def test_E24b_still_fires_on_a_genuinely_narrow_column():
-    """The rule itself is not broken -- only unreachable through one adapter."""
-    decision = next(d for d in choose_equipment(DesignContext(
-        pressure_Pa=ATM, n_supercritical_at_feed=0,
-        column_diameter_m=0.4)) if d.step == 24)
+        column_diameter_m=result.column_diameter_m)) if d.step == 24)
     assert decision.choice == "packing"
     assert decision.rule_id == "E-24b"
+
+
+def test_the_threshold_was_never_tuned_to_the_floor():
+    """0.6 m is a physical criterion about manway access. Had it been raised to
+    meet BioSTEAM's 0.914 m artefact, this column -- comfortably a tray column
+    at 0.8 m -- would wrongly be given packing."""
+    decision = next(d for d in choose_equipment(DesignContext(
+        pressure_Pa=ATM, n_supercritical_at_feed=0,
+        column_diameter_m=0.8)) if d.step == 24)
+    assert decision.choice == "trays"
