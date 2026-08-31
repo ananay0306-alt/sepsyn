@@ -39,8 +39,8 @@ def test_safe_eval_refuses_unknown_names():
 
 def test_rules_load_and_are_well_formed():
     rules = load_rules()
-    assert len(rules) == 11
-    assert len({r.id for r in rules}) == 11         # ids are unique
+    assert len(rules) == 12
+    assert len({r.id for r in rules}) == 12         # ids are unique
     # load_rules sorts by PRIORITY, not by id -- R-04 (supercritical) must be
     # evaluated before R-01 (distillation viable)
     priorities = [r.priority for r in rules]
@@ -55,7 +55,7 @@ def test_every_rule_condition_evaluates_against_a_record():
     """A rule whose condition cannot be evaluated is a broken rule."""
     ns = record().as_namespace()
     rules = load_rules()
-    assert len(rules) == 11  # otherwise this test passes vacuously on []
+    assert len(rules) == 12  # otherwise this test passes vacuously on []
     for r in rules:
         result = safe_eval(r.when, ns)
         assert isinstance(result, bool)
@@ -117,7 +117,7 @@ def test_shipped_rules_all_load():
     """Guard against the new validators being too strict and rejecting a
     legitimate rule in the real rules.yaml."""
     rules = load_rules()
-    assert len(rules) == 11
+    assert len(rules) == 12
 
 
 def test_as_namespace_and_validator_share_one_source_of_truth():

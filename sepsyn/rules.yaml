@@ -173,3 +173,37 @@
     temperature alone. If the component is thermally robust the rule is simply
     dismissed; if it is not, the usual answer is vacuum operation, which then
     conflicts with the preference for pressures at or above one atmosphere
+
+- id: R-12
+  name: the mixture splits into two liquid phases
+  priority: 15
+  when: "has_two_liquid_phases"
+  verdict: caution
+  technologies: [decanter, heterogeneous_azeotropic_distillation, distillation]
+  because: >-
+    a second liquid phase appears across part of the composition range, so the
+    vapour-liquid model every number in this design was computed with does not
+    describe the mixture there; the design may look entirely reasonable and
+    still describe a separation that will not happen
+  cite: "Seader & Henley, Separation Process Principles, Ch.11"
+  requires:
+    - >-
+      a three-phase vapour-liquid-liquid flash, or a rigorous column model that
+      carries two liquid phases, before any stage count or duty from this tool
+      is used. The shortcut methods here assume a single liquid on every tray
+    - >-
+      whether the split is wanted or merely present. A miscibility gap is often
+      the cheapest separation available -- a decanter does in one vessel what a
+      column cannot do at all -- so this is a question about the flowsheet, not
+      only about the column
+  limitations: >-
+    two of them, and both matter. First, the gap was located at the bubble
+    temperature given by the ordinary vapour-liquid model, which is the model
+    this rule is questioning; that temperature places the probe near where the
+    column would operate but is not itself trustworthy once a split has been
+    found. Second, and measured: the underlying activity-coefficient model
+    predicts a false miscibility gap for water and glycerol, which are in fact
+    miscible in all proportions, and that false positive is indistinguishable
+    from a true one by gap width or composition difference. Aqueous polyols are
+    a known weak point. Check the named pair against literature solubility data
+    before acting on this, and treat it as caution rather than a finding

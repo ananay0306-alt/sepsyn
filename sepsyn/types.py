@@ -13,6 +13,7 @@ RULE_VISIBLE_FIELDS = frozenset({
     "heavy_key_mole_fraction",
     "bottoms_T_at_column_P",
     "steam_T",
+    "has_two_liquid_phases",
 })
 
 
@@ -86,6 +87,10 @@ class PropertyRecord:
     """Boiling temperature of the heaviest component at column pressure. The
     hot end of the column, and the counterpart to condensing_T_at_column_P.
     None means it could not be computed, NOT that the column runs cold."""
+    has_two_liquid_phases: bool | None = None
+    """True/False if the liquid-liquid search actually ran; None means it was
+    never checked (no liquid phase exists at feed conditions), which is NOT the
+    same claim as "checked and found none". Heuristic step 6."""
     steam_T: float = 433.15
     """Available heating utility temperature. Default mirrors
     properties.STEAM_T (low pressure steam, 160 C)."""

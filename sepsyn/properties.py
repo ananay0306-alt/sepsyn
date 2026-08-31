@@ -105,6 +105,7 @@ import warnings
 
 from sepsyn.types import Alpha, PropertyRecord
 from sepsyn.azeotropes import find_azeotropes
+from sepsyn.lle import find_liquid_split
 
 warnings.filterwarnings("ignore")
 
@@ -198,10 +199,29 @@ def build_property_record(
         # means "not checked" -- it must not be conflated with False, which
         # would claim the search ran and found nothing.
         has_azeo: bool | None = None
+        # Same discipline as the azeotrope search: with no liquid phase there
+        # is nothing to split, so the search never ran. None, not False.
+        splits: bool | None = None
         phase = "vapor"
     else:
         alphas = relative_volatilities(feed, P)
         has_azeo = bool(find_azeotropes(list(feed.names), P))
+        # The KEY PAIR when it is known, every pair when it is not.
+        #
+        # Same reasoning as bottoms_T_at_column_P below: before keys are named
+        # the tool does not know which separation is being asked about, so it
+        # screens broadly; once they are named, the claim R-12 makes is about
+        # the model underneath THIS separation, and the model underneath this
+        # separation is the one for the key pair. The source heuristics are
+        # explicitly binary and say non-key handling is a multicomponent
+        # problem that does not apply.
+        #
+        # This is not a cosmetic narrowing. On the milestone feed the non-key
+        # pair water/glycerol trips UNIFAC's known false miscibility gap (see
+        # lle.py), while the actual key pair methanol/water does not.
+        pair = ([light_key, heavy_key] if light_key and heavy_key
+                else list(feed.names))
+        splits = find_liquid_split(pair, P) is not None
         phase = "vapor" if n_super > 0 else "liquid"
 
     # the most volatile component determines whether the condenser works
@@ -241,5 +261,6 @@ def build_property_record(
         light_key_mole_fraction=fracs.get(light_key) if light_key else None,
         heavy_key_mole_fraction=fracs.get(heavy_key) if heavy_key else None,
         bottoms_T_at_column_P=bottoms_T,
+        has_two_liquid_phases=splits,
         steam_T=STEAM_T,
     )

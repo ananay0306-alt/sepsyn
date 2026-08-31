@@ -78,7 +78,7 @@ def test_namespace_exposes_exactly_the_rule_visible_fields():
     )
     ns = rec.as_namespace()
     assert set(ns) == {
-        "bottoms_T_at_column_P", "steam_T",
+        "bottoms_T_at_column_P", "steam_T", "has_two_liquid_phases",
         "n_components", "n_supercritical_at_feed", "min_alpha",
         "has_azeotrope", "feed_phase", "condensing_T_at_column_P",
         "cooling_water_T", "light_key_mole_fraction",
