@@ -1,14 +1,14 @@
 # sepsyn — status
 
-Updated 2026-08-30 (evening). Check this file; it is the tracker.
+Updated 2026-08-30 (late evening). Check this file; it is the tracker.
 `cat STATUS.md` beats scrolling a chat log.
 
 ## Where we are
 
 | | |
 |---|---|
-| Milestones done | **1 of 6** (M1 is the foundation the other five sit on) |
-| Tests | **125 passing**, 11 s |
+| Milestones done | **1 of 6**, plus the 41-step heuristics fold-in COMPLETE |
+| Tests | **213 passing**, 16 s |
 | Blocking right now | **Risk 5**, re-tested and confirmed genuine. M2 needs a new acceptance case |
 | Waiting on you | **3 decisions** (below). M2 does not move until these are made. |
 
@@ -86,9 +86,9 @@ The lesson: every large disagreement but one was a configuration or definition
 mismatch, not physics. **The harness must assert configuration equivalence, not
 just compare numbers.**
 
-### [~] Workflow steps from the binary heuristics list · ITEM 1 DONE
-The 41 step design sequence, being folded into the rule table. sepsyn already
-covered about 20 of the 41.
+### [x] Workflow steps from the binary heuristics list · COMPLETE
+The 41 step design sequence, folded into the rule tables. sepsyn covered about
+20 of the 41 to begin with; the gaps named on 08-30 are now closed.
 - [x] **Item 1** — reboiler side pressure rule (R-10) and thermal limit (R-11);
       record gains `bottoms_T_at_column_P` and `steam_T`; `safe_eval` now
       permits arithmetic so thresholds can be expressed against another
@@ -98,9 +98,67 @@ covered about 20 of the 41.
       set it, so every design had a vapour distillate. Now stated explicitly.
       Energy tolerance measured at a constant 5.00 % model margin across four
       cases, set to 6 %. **152 tests passing**
-- [ ] Item 3 — feed condition q, steps 15 to 17
-- [ ] Item 4 — equipment choices as rules, steps 22 to 25
-- [ ] Item 5 — a thin skill as the conversational front door
+- [x] **Item 3** — feed condition q, steps 15 to 17. `sepsyn/feed_condition.py`,
+      `ColumnSpec.feed_q` to impose it, `ColumnResult.feed_q` to record it,
+      `--feed-q` on the CLI, and the q printed with every design whether or not
+      it was imposed. **171 tests**
+- [x] **Item 4** — equipment choices, steps 22 to 25, in their OWN table
+      (`equipment_rules.yaml` + `equipment.py`). Not in rules.yaml: a screening
+      rule feeds overall_verdict where worst-wins, so a preference for packing
+      dropped in there could outrank a feasibility finding. This is Section 13's
+      "separate screening rules from design rules", built. **197 tests**
+- [x] **Item 5** — VLLE check, step 6. `sepsyn/lle.py`, rule R-12,
+      `has_two_liquid_phases` on the record. **210 tests**
+- [x] **Item 6** — thin skill at `skill/SKILL.md`, symlinked to
+      `~/.claude/skills/sepsyn`. Runs the CLI, reimplements nothing.
+      **213 tests**
+
+Note: item 5 was the VLLE check in the 08-30 plan, and an earlier revision of
+this file dropped it and promoted the skill into its place. That looks like an
+omission rather than a decision, so both were built.
+
+#### What items 3 to 6 found
+
+| finding | where | consequence |
+|---|---|---|
+| thermosteam returns a bubble point ABOVE the critical point without complaint — benzene/toluene at 200 bar gives 673 K against a Tc of 562 K | feed_condition | extrapolation guarded explicitly before and after the solve; the solver will not raise |
+| feed enthalpy from a bare `Stream.H` keeps the phase the stream was built with, so a 500 K vapour reads as a liquid | feed_condition | q's SIGN inverts. Feed enthalpy now comes from a TP flash |
+| the condenser type was a hardcoded constant in the adapter while the rules recommended one | equipment | moved onto ColumnSpec and decided BEFORE the column is built; the record and the run can no longer disagree |
+| BioSTEAM reports Diameter in FEET | equipment | 3.8 read as metres would make the small-diameter branch unreachable for every column ever designed. Converted in the adapter, pinned by a test |
+| thermosteam's LLE returns two phases of IDENTICAL composition for a miscible mixture | lle | detecting on phase AMOUNTS reported ethanol/water as splitting. Criterion is composition DIFFERENCE |
+| **UNIFAC predicts a FALSE miscibility gap for water/glycerol** | lle | not fixable by any threshold — it is indistinguishable from a true split by width, point count and dx alike. See below |
+
+#### The water/glycerol false positive, and what was done about it
+
+Panel of eight pairs at 1 atm, 49 compositions each:
+
+| pair | truth | points | width | max dx |
+|---|---|---|---|---|
+| Water/n-Butanol | SPLITS | 20 | 0.42 | 0.510 |
+| Water/Benzene | SPLITS | 48 | 0.94 | 0.995 |
+| **Water/Glycerol** | **miscible** | **10** | **0.22** | **0.493** |
+| Ethanol/Water | miscible | 0 | 0.00 | 0.000 |
+| Methanol/Water | miscible | 0 | 0.00 | 0.000 |
+| Methanol/Glycerol | miscible | 0 | 0.00 | 0.000 |
+| Benzene/Toluene | miscible | 0 | 0.00 | 0.000 |
+| Ethanol/Benzene | miscible | 0 | 0.00 | 0.000 |
+
+Seven of eight correct; the eighth sits inside the true-positive range on every
+metric. The error is in the activity model, not the search. Two consequences:
+
+1. **R-12 is `caution`, not `undetermined`.** Undetermined blocks `--design`,
+   and blocking on a false alarm at this rate is worse calibrated than flagging
+   it with the pair named. The measurement is in the rule's `limitations`, so a
+   reader of the REPORT sees it, not only a reader of the source.
+2. **The search follows the KEYS when they are known** — same precedent as
+   `bottoms_T_at_column_P`. On the milestone feed the NON-KEY pair
+   water/glycerol trips the false gap while the key pair methanol/water does
+   not, so the acceptance case still reads FEASIBLE and still designs. The
+   broader no-keys behaviour is pinned by its own test, false positive included.
+
+Open question for you: is the water/glycerol false positive worth chasing? A
+UNIFAC-LLE parameter set or a switch to NRTL for aqueous polyols would fix it,
+but that is a thermodynamics change with reach well beyond R-12.
 
 ### [ ] M3 — sequencing multicomponent trains · NOT STARTED, NO SPEC
 Today the tool stops at one column and says so. The "NOT SPECIFIED … separate
