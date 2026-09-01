@@ -200,6 +200,11 @@ def main(argv: list[str] | None = None) -> int:
                         "rule fired or not, the equipment choices with their "
                         "status, and every verification check. This is what "
                         "makes two runs comparable rather than merely readable")
+    p.add_argument("--html", dest="html_path",
+                   help="write the run as a self-contained HTML page: the cost "
+                        "curve plotted with its optimum marked, the assumptions "
+                        "it made, every rule, and the verification checks. No "
+                        "network needed to open it")
     p.add_argument("--explain", action="store_true",
                    help="also print rules that did not fire, with their values")
     p.add_argument("--design", action="store_true",
@@ -248,10 +253,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.out:
             with open(args.out, "w") as fh:
                 fh.write("\n".join(printed).rstrip() + "\n")
-        if args.json_path:
+        if args.json_path or args.html_path:
             from sepsyn.serialize import run_to_dict, write_json
-            write_json(args.json_path,
-                       run_to_dict(feed, record, verdicts, overall, designed))
+            payload = run_to_dict(feed, record, verdicts, overall, designed)
+            if args.json_path:
+                write_json(args.json_path, payload)
+            if args.html_path:
+                from sepsyn.htmlreport import write_html
+                write_html(args.html_path, payload)
 
     if args.design:
         if overall not in ("feasible", "caution"):

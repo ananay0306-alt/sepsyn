@@ -8,7 +8,7 @@ Updated 2026-08-31. Check this file; it is the tracker.
 | | |
 |---|---|
 | Milestones done | **1 of 6**, plus the 41-step heuristics fold-in COMPLETE |
-| Tests | **240 passing**, 18 s |
+| Tests | **251 passing**, 19 s |
 | Blocking right now | **Risk 5**, re-tested and confirmed genuine. M2 needs a new acceptance case |
 | Waiting on you | **2 decisions** (below). M2 does not move until these are made. |
 | Published | **public** at github.com/ananay0306-alt/sepsyn, MIT |

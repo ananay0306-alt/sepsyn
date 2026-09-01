@@ -75,7 +75,15 @@ tested. Flows are kmol/hr, temperatures K, pressures Pa.
 ```bash
 --out results/run.txt     # the readable report
 --json results/run.json   # the same run as structured data
+--html results/run.html   # a page: charts, assumptions, rules, checks
 ```
+
+`--html` writes a self-contained page. No fonts, no CDN, no scripts fetched, so
+it opens on a machine with no network and still works in five years. The reflux
+sweep is drawn as a curve with its optimum marked, because locating a minimum
+in a trade-off is a chart's job and it had been a table of eight rows the reader
+had to scan. Stages against reflux is a second measure on a different scale, so
+it gets its own chart rather than a second axis.
 
 The JSON is what makes two runs *comparable* rather than merely readable, which
 is the argument the whole tool rests on. Three things in it are deliberately
@@ -158,7 +166,7 @@ requires:
 .venv/bin/python -m pytest -q
 ```
 
-240 tests, about 18 seconds. They are worth reading: several encode a measured
+251 tests, about 19 seconds. They are worth reading: several encode a measured
 finding rather than an expected value, including the ones that pin third-party
 behaviour this code depends on.
 
