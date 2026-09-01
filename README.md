@@ -158,7 +158,7 @@ requires:
 .venv/bin/python -m pytest -q
 ```
 
-230 tests, about 17 seconds. They are worth reading: several encode a measured
+240 tests, about 18 seconds. They are worth reading: several encode a measured
 finding rather than an expected value, including the ones that pin third-party
 behaviour this code depends on.
 
