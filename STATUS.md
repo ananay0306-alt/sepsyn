@@ -7,7 +7,7 @@ Updated 2026-09-08. Check this file; it is the tracker.
 
 | | |
 |---|---|
-| Milestones done | **1 of 6**, plus the heuristics fold-in and **M3 Phase A** |
+| Milestones done | **1 of 6**, plus the heuristics fold-in and **M3 COMPLETE** |
 | Tests | **251 passing**, 19 s |
 | Blocking right now | **Risk 5**, re-tested and confirmed genuine. M2 needs a new acceptance case |
 | Waiting on you | **2 decisions** (below). M2 does not move until these are made. |
@@ -173,9 +173,41 @@ Spec `docs/specs/2026-09-08-multicomponent-sequencing-design.md`, plan
 - [x] **Phase A** — `sepsyn/sequencing/`. Enumeration pinned to Catalan(n-1),
       `ShortcutColumn` adapter path, per-column screening, product propagation,
       ranking, `--sequence` on the CLI. 56 new tests
-- [ ] **Phase B** — component tags, constraint rules, proxy scoring, and the
-      adversarial test set. Needs Phase A's ranking as the ground truth it
-      scores against, which is why the spec keeps them apart
+- [x] **Phase B** — component tags, exposure counting, the four heuristics as
+      scorable proxies, the scorecard, and the adversarial feeds. 48 new tests
+
+#### The answer, measured
+
+On propane/butane/pentane/hexane at 10/20/60/10, where the most plentiful
+component sits in the MIDDLE of the volatility order and the heuristics
+therefore cannot all agree:
+
+| heuristic | verdict |
+|---|---|
+| easiest_first | **picked the winner** |
+| hardest_last | **picked the winner** |
+| most_plentiful_first | +5.1 % worse |
+| equimolar | +5.1 % worse |
+
+The volatility heuristics beat the flow-based ones on this feed. One feed is
+not a general law, but it is a measurement, which is what the review asked for
+and what no weighting scheme can supply. The machinery now exists to run it on
+any feed.
+
+Exposure is reported as a trade-off rather than a ranking input: the cheapest
+sequence carries 30.0 kmol/hr of hexane through its columns, the runner-up
+carries 20.1 for 2.6 percent more money. Neither number was allowed to move the
+ranking, because a traversal threshold would be invented and a materials cost
+factor has no source.
+
+#### A metric that had to be corrected
+
+Exposure was specified as "how many columns each tagged component passes
+through" and that metric cannot do its job. Sharp splits are imperfect, so a
+trace of every component propagates almost everywhere and the count saturates:
+tagging hexane gives 3 columns for BOTH the sequence that carries it at full
+flow throughout and the one that removes it at the first column. Weighting by
+flow separates them threefold and still invents no threshold.
 
 **The question this milestone answers.** Textbook sequencing heuristics
 conflict: if a component is both the easiest split and the corrosive one, two
