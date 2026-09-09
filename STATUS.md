@@ -1,13 +1,13 @@
 # sepsyn — status
 
-Updated 2026-08-31. Check this file; it is the tracker.
+Updated 2026-09-08. Check this file; it is the tracker.
 `cat STATUS.md` beats scrolling a chat log.
 
 ## Where we are
 
 | | |
 |---|---|
-| Milestones done | **1 of 6**, plus the 41-step heuristics fold-in COMPLETE |
+| Milestones done | **1 of 6**, plus the heuristics fold-in and **M3 Phase A** |
 | Tests | **251 passing**, 19 s |
 | Blocking right now | **Risk 5**, re-tested and confirmed genuine. M2 needs a new acceptance case |
 | Waiting on you | **2 decisions** (below). M2 does not move until these are made. |
@@ -165,9 +165,52 @@ Open question for you: is the water/glycerol false positive worth chasing? A
 UNIFAC-LLE parameter set or a switch to NRTL for aqueous polyols would fix it,
 but that is a thermodynamics change with reach well beyond R-12.
 
-### [ ] M3 — sequencing multicomponent trains · NOT STARTED, NO SPEC
-Today the tool stops at one column and says so. The "NOT SPECIFIED … separate
-products need a second column" note is this milestone announcing itself.
+### [~] M3 — sequencing multicomponent trains · PHASE A DONE
+Enumerate every sharp-split sequence, screen and design each column, rank them.
+Spec `docs/specs/2026-09-08-multicomponent-sequencing-design.md`, plan
+`docs/plans/2026-09-08-m3-phase-a-sequencing.md`.
+
+- [x] **Phase A** — `sepsyn/sequencing/`. Enumeration pinned to Catalan(n-1),
+      `ShortcutColumn` adapter path, per-column screening, product propagation,
+      ranking, `--sequence` on the CLI. 56 new tests
+- [ ] **Phase B** — component tags, constraint rules, proxy scoring, and the
+      adversarial test set. Needs Phase A's ranking as the ground truth it
+      scores against, which is why the spec keeps them apart
+
+**The question this milestone answers.** Textbook sequencing heuristics
+conflict: if a component is both the easiest split and the corrosive one, two
+rules point opposite ways. The spec's answer is in two parts. Structurally, the
+four volatility and flow heuristics are competing ESTIMATORS of one objective
+while corrosion and hazard are CONSTRAINTS; they appear to collide only because
+textbooks write them in identical imperative grammar. Empirically, what remains
+is measurable rather than arguable: evaluate every sequence and score each proxy
+by how often it predicted the winner.
+
+**Measured before any code was written.** 0.01 s per column, flat. Six
+components is 210 columns in 2.0 s with zero convergence failures, so
+exhaustive evaluation is free and no pruning heuristic is needed. Cost and
+vapour load pick the same WINNER at 4, 5 and 6 components but their orderings
+diverge by up to 14 of 42 places below it, so the report gives a winner and an
+unordered near-optimal set rather than a leaderboard.
+
+**What the probes could NOT answer, and it matters.** All the test feeds were
+n-alkanes, where the lightest component is also the most plentiful, so every
+heuristic picks the same sequence and none of them ever disagree. Nothing was
+learned about which is right. Phase B therefore needs a test set that is
+ADVERSARIAL BY CONSTRUCTION. The conflict is not hard to resolve; it is hard to
+observe.
+
+#### Bug found by Phase A, in shared code
+
+`build_property_record` computed `has_azeotrope` across EVERY pair in the group.
+On a train that eliminates a column for a separation it is not performing: the
+acetone/ethanol/water feed had both its sequences eliminated at the first
+column, reporting that no separation was possible, when the acetone split is
+clean and only the ethanol/water split is blocked.
+
+`find_liquid_split` had already been narrowed to the key pair on 08-31 for
+exactly this reason, and the azeotrope search beside it was missed then. Both
+now use the same pair and a test pins them together.
 
 ### [ ] M4 — heuristic database & retrieval · NOT STARTED, NO SPEC
 Store separation heuristics as conditional guidance that triggers a
