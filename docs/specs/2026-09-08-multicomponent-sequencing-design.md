@@ -293,10 +293,28 @@ disagree with.
 
 ## 12. Open questions
 
-- Should a constraint eliminate a sequence outright, or attach a materials cost
-  multiplier to every column the tagged component passes through? The second is
-  more informative and needs a materials cost factor the tool does not have.
-  Suggested resolution: eliminate by default, penalise when a factor is given.
+- ~~Should a constraint eliminate a sequence outright, or attach a materials
+  cost multiplier?~~ **RESOLVED 2026-09-08: neither. It COUNTS.**
+
+  Both original options required inventing a number the tool has no source for:
+  elimination needs a threshold (how many columns may a corrosive component
+  traverse?) and a multiplier needs a materials cost factor. Nothing justifies
+  either value, and burying an invented number inside a verdict is precisely
+  what this project exists to prevent.
+
+  Instead, exposure is counted and reported beside the cost. For every sequence,
+  how many columns each tagged component passes through. The output is a
+  trade-off the reader resolves: this route is cheapest and exposes three
+  columns to HCl, that one costs eight percent more and exposes one.
+
+  This is the same treatment equipment choices already get: surface the decision
+  with its basis, do not silently make it. It also answers the review question
+  more honestly than a ranking would, because the conflict between corrosion and
+  volatility is shown rather than arbitrated away.
+
+  A materials cost factor remains a sensible future addition for anyone who has
+  one, at which point corrosion enters the objective directly and the conflict
+  genuinely dissolves rather than being displayed.
 - How many components before exhaustive enumeration should give way to a pruned
   search? Measured comfortable at 6 (2 s). Eight is 429 sequences and roughly
   30 s by extrapolation, which is itself an extrapolation and should be measured
