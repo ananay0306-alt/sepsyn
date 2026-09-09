@@ -34,14 +34,19 @@ eviction changed the failure mode, not the outcome.
       It had become the de facto trunk: 21 commits, not 5, and `main` was that
       far behind. Fast-forwarded, so nothing was rewritten, and
       `rule-schema-requires` turned out to be already contained.
-- [ ] **1. Switch the M2 bring-up case to benzene/toluene?**
-      Methanol/water/glycerol was chosen when both sides were shortcut methods
-      and will not solve rigorously. Benzene/toluene solved rigorously in
-      seconds. *Recommend: yes*, keep methanol/water as a later stress case.
-- [ ] **2. M2 transport — live subprocess, recorded fixtures, or both?**
-      Solve times of minutes make a live adapter impractical in the suite.
-      *Recommend: both* — fixtures for a hermetic suite, live behind an opt-in
-      marker, since fixtures alone prove nothing about the protocol.
+- [x] ~~**Switch the M2 bring-up case to benzene/toluene?**~~ **RULED 09-09:
+      staged.** Benzene/toluene to bring the harness up, because every number
+      on both sides is already known there and a mismatch is diagnosable. The
+      four-component alkane feed is the actual target, since M3 landed after
+      the old spec was written and every column M3 ranks goes through
+      ShortcutColumn. Binary is a rung, not the destination.
+- [x] ~~**M2 transport?**~~ **RULED 09-09: both.** Recorded fixtures keep the
+      suite hermetic, live subprocess behind an opt-in marker. Fixtures alone
+      prove nothing about the protocol; live alone would put minute-long solves
+      into a suite that finishes in under a minute, and a 300 s timeout was
+      already observed in the probe.
+
+Nothing is waiting on you. The next step is planning M2 from the 09-09 spec.
 
 ## The road
 
