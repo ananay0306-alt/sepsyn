@@ -29,6 +29,14 @@ class Ranking:
     orderings_identical: bool
     worst_displacement: int
     evaluated: int
+    all_feasible: tuple[SequenceOutcome, ...] = ()
+    """Every sequence that could be designed, cheapest first. Carried so that a
+    heuristic naming a feasible but expensive train can still be told what it
+    cost; without it, being badly wrong is indistinguishable from naming
+    something unbuildable.
+
+    Last in the field list because it carries a default and the fields before
+    it do not."""
 
 
 def rank(outcomes: list[SequenceOutcome],
@@ -52,6 +60,7 @@ def rank(outcomes: list[SequenceOutcome],
         winner=winner,
         near_optimal=near,
         eliminated=eliminated,
+        all_feasible=tuple(by_cost),
         metrics_agree_on_winner=(by_cost[0] is by_vapour[0]),
         orderings_identical=(displacement == 0),
         worst_displacement=displacement,

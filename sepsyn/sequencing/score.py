@@ -39,14 +39,15 @@ def score_proxies(feed, order: tuple[str, ...], ranking: Ranking,
     alphas = adjacent_alphas(feed, order, P_Pa)
     flows = {c.name: c.flow_kmol_hr for c in feed.components}
 
-    costs: dict[str, float] = {}
-    near: set[str] = set()
+    # EVERY evaluated sequence, not only the near-optimal ones. A proxy that
+    # names a feasible but expensive train must still report what it cost;
+    # otherwise being badly wrong is indistinguishable from naming something
+    # that could not be built, and both show as no penalty at all.
+    costs = {o.name: o.total_cost_USD_yr for o in ranking.all_feasible}
+    near = {o.name for o in ranking.near_optimal}
     if ranking.winner is not None:
-        costs[ranking.winner.name] = ranking.winner.total_cost_USD_yr
+        costs.setdefault(ranking.winner.name, ranking.winner.total_cost_USD_yr)
         near.add(ranking.winner.name)
-    for o in ranking.near_optimal:
-        costs[o.name] = o.total_cost_USD_yr
-        near.add(o.name)
 
     winner_name = ranking.winner.name if ranking.winner else ""
     winner_cost = ranking.winner.total_cost_USD_yr if ranking.winner else None
