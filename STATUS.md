@@ -165,7 +165,7 @@ Open question for you: is the water/glycerol false positive worth chasing? A
 UNIFAC-LLE parameter set or a switch to NRTL for aqueous polyols would fix it,
 but that is a thermodynamics change with reach well beyond R-12.
 
-### [~] M3 — sequencing multicomponent trains · PHASE A DONE
+### [x] M3 — sequencing multicomponent trains · COMPLETE
 Enumerate every sharp-split sequence, screen and design each column, rank them.
 Spec `docs/specs/2026-09-08-multicomponent-sequencing-design.md`, plan
 `docs/plans/2026-09-08-m3-phase-a-sequencing.md`.
