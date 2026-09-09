@@ -1,0 +1,70 @@
+"""Score each proxy against the evaluated ranking.
+
+This is the module that answers the question the whole milestone exists for.
+When two textbook heuristics disagree about which split to do first, which one
+is right? The answer is not argued from authority: the exhaustive ranking is
+the ground truth, each proxy names one sequence, and the scorecard reports
+whether it picked the winner and what being wrong cost.
+"""
+from dataclasses import dataclass
+
+from sepsyn.sequencing.enumeration import label
+from sepsyn.sequencing.heuristics import PROXIES, adjacent_alphas
+from sepsyn.sequencing.rank import Ranking
+
+
+@dataclass(frozen=True)
+class ProxyScore:
+    name: str
+    sequence_name: str
+    picked_winner: bool
+    within_near_optimal: bool
+    cost_penalty: float | None
+    """Fraction above the winner's cost. None when the proxy named a sequence
+    that could not be designed, or when nothing could be."""
+    cost_USD_yr: float | None
+
+
+@dataclass(frozen=True)
+class Scorecard:
+    scores: tuple[ProxyScore, ...]
+    winner_name: str
+    proxies_agree: bool
+    """True when every proxy named the same sequence. On such a feed the
+    scorecard cannot discriminate between them, however confident it looks."""
+
+
+def score_proxies(feed, order: tuple[str, ...], ranking: Ranking,
+                  P_Pa: float) -> Scorecard:
+    alphas = adjacent_alphas(feed, order, P_Pa)
+    flows = {c.name: c.flow_kmol_hr for c in feed.components}
+
+    costs: dict[str, float] = {}
+    near: set[str] = set()
+    if ranking.winner is not None:
+        costs[ranking.winner.name] = ranking.winner.total_cost_USD_yr
+        near.add(ranking.winner.name)
+    for o in ranking.near_optimal:
+        costs[o.name] = o.total_cost_USD_yr
+        near.add(o.name)
+
+    winner_name = ranking.winner.name if ranking.winner else ""
+    winner_cost = ranking.winner.total_cost_USD_yr if ranking.winner else None
+
+    scores = []
+    chosen: set[str] = set()
+    for name, proxy in PROXIES.items():
+        picked = label(proxy(order, flows, alphas))
+        chosen.add(picked)
+        cost = costs.get(picked)
+        penalty = (None if (cost is None or not winner_cost)
+                   else cost / winner_cost - 1.0)
+        scores.append(ProxyScore(
+            name=name,
+            sequence_name=picked,
+            picked_winner=bool(winner_name) and picked == winner_name,
+            within_near_optimal=picked in near,
+            cost_penalty=penalty,
+            cost_USD_yr=cost,
+        ))
+    return Scorecard(tuple(scores), winner_name, len(chosen) == 1)
