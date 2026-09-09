@@ -214,6 +214,10 @@ def main(argv: list[str] | None = None) -> int:
                         "separated, e.g. 'Propane,Butane,Pentane'. Volatility "
                         "order is what makes a split sharp, so it is required "
                         "rather than guessed from boiling points")
+    p.add_argument("--tag", action="append", default=[],
+                   help="mark a component, e.g. --tag HCl:corrosive. Counted "
+                        "and reported, never used to rank or eliminate. "
+                        "Repeatable")
     p.add_argument("--explain", action="store_true",
                    help="also print rules that did not fire, with their values")
     p.add_argument("--design", action="store_true",
@@ -286,9 +290,19 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         from sepsyn.sequencing.rank import sweep
         from sepsyn.sequencing.report import format_sequencing
+        from sepsyn.sequencing.score import score_proxies
+        from sepsyn.sequencing.tags import UnknownTag, parse_tags
         from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
+        try:
+            tags = parse_tags(args.tag, feed.names)
+        except UnknownTag as exc:
+            emit(f"\n{exc}")
+            save()
+            return 2
+        ranking = sweep(BioSteamSimulator(), feed, order, tags=tags or None)
+        card = score_proxies(feed, order, ranking, feed.P_Pa)
         emit()
-        emit(format_sequencing(sweep(BioSteamSimulator(), feed, order)))
+        emit(format_sequencing(ranking, card, tags))
         save()
         return 0
 

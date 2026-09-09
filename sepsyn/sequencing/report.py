@@ -16,7 +16,7 @@ def _wrap(prefix: str, text: str) -> list[str]:
     return [prefix + body[0]] + [pad + line for line in body[1:]]
 
 
-def format_sequencing(ranking: Ranking) -> str:
+def format_sequencing(ranking: Ranking, scorecard=None, tags=None) -> str:
     lines: list[str] = []
     feasible = ranking.evaluated - len(ranking.eliminated)
     lines.append("SEQUENCES")
@@ -72,6 +72,49 @@ def format_sequencing(ranking: Ranking) -> str:
                 f"Past the winner the two orderings diverge by up to "
                 f"{ranking.worst_displacement} of {feasible} places, which is "
                 f"why the set above is unordered."))
+
+    if tags and ranking.winner is not None:
+        lines.append("")
+        lines.append("EXPOSURE  (counted, NOT used to rank)")
+        lines.extend(_wrap(
+            "  ",
+            "Tagged components, weighted by how much of them passes through "
+            "each column. This did not change the ranking above and eliminated "
+            "nothing: a traversal threshold would be invented and a materials "
+            "cost factor has no source. The trade-off is yours to resolve."))
+        shown = [ranking.winner] + [o for o in ranking.near_optimal
+                                    if o is not ranking.winner]
+        for o in shown:
+            if not o.exposure:
+                continue
+            lines.append(f"    {o.name}")
+            for name, load in sorted(o.exposure.items()):
+                marks = "/".join(sorted(tags.get(name, ())))
+                cols = o.exposure_columns.get(name, 0)
+                lines.extend(_wrap(
+                    "      ",
+                    f"{name} ({marks}): {load:,.1f} kmol/hr summed across "
+                    f"{cols} of {len(o.columns)} columns"))
+            lines.append(f"      ${o.total_cost_USD_yr:,.0f}/yr")
+
+    if scorecard is not None and scorecard.scores:
+        lines.append("")
+        lines.append("HEURISTICS  (scored against the evaluated ranking)")
+        if scorecard.proxies_agree:
+            lines.extend(_wrap(
+                "  ",
+                "Every heuristic picked the same sequence on this feed, so "
+                "this scorecard cannot tell them apart. Agreement here is not "
+                "evidence that any of them is right."))
+        for s in sorted(scorecard.scores, key=lambda x: x.name):
+            if s.picked_winner:
+                verdict = "picked the winner"
+            elif s.cost_penalty is None:
+                verdict = "named a sequence that could not be designed"
+            else:
+                verdict = f"{s.cost_penalty:+.1%} worse than the winner"
+            lines.append(f"    {s.name:<22} {verdict}")
+            lines.extend(_wrap("      ", s.sequence_name))
 
     if ranking.eliminated:
         lines.append("")
