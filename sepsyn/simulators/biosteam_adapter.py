@@ -227,6 +227,69 @@ class BioSteamSimulator:
                 _EMPTY_COLUMN, error=f"{type(exc).__name__}: {exc}"
             )
 
+    def design_multicomponent(self, feed: Feed, spec: ColumnSpec) -> ColumnResult:
+        """A column with more than two components, by Fenske, Underwood and
+        Gilliland.
+
+        Separate from design_column rather than replacing it. ShortcutColumn is
+        a different correlation with different convergence behaviour, and
+        swapping it underneath the existing method would change every number
+        the 251 existing tests pin.
+
+        Components lighter than the light key leave overhead and those heavier
+        than the heavy key leave in the bottoms; BioSTEAM assumes that, which is
+        exactly the sharp-split assumption the sequence tree is built on.
+        """
+        try:
+            if spec.condenser_type not in ("total", "partial"):
+                raise ValueError(
+                    f"condenser_type must be 'total' or 'partial', got "
+                    f"{spec.condenser_type!r}. Guessing here would hide the "
+                    f"choice, which is the one thing step 22 forbids."
+                )
+            with contextlib.redirect_stdout(io.StringIO()):
+                bst, s = self._setup(feed)
+                feed_q = self._apply_and_measure_feed_q(s, feed, spec)
+                col = bst.ShortcutColumn(
+                    "C1", ins=s, outs=("D", "B"),
+                    LHK=(spec.light_key, spec.heavy_key),
+                    Lr=spec.lk_recovery_to_distillate,
+                    Hr=spec.hk_recovery_to_bottoms,
+                    k=spec.reflux_over_minimum,
+                    P=spec.pressure_Pa,
+                    partial_condenser=(spec.condenser_type == "partial"),
+                )
+                col.simulate()
+                D, B = col.outs
+                d = col.design_results
+                qc = abs(float(col.condenser.Q)) / 3600.0
+                qr = abs(float(col.reboiler.Q)) / 3600.0
+                return ColumnResult(
+                    distillate={n: float(D.imol[n]) for n in feed.names},
+                    bottoms={n: float(B.imol[n]) for n in feed.names},
+                    stages=float(d.get("Actual stages", 0.0)),
+                    reflux=float(d.get("Reflux", 0.0)),
+                    minimum_reflux=float(d.get("Minimum reflux", 0.0)),
+                    installed_cost_USD=float(col.installed_cost),
+                    utility_cost_USD_hr=float(col.utility_cost),
+                    converged=True, error=None,
+                    condenser_duty_kW=float(qc),
+                    reboiler_duty_kW=float(qr),
+                    distillate_T_K=float(D.T),
+                    bottoms_T_K=float(B.T),
+                    feed_H_kW=float(s.H) / 3600.0,
+                    distillate_H_kW=float(D.H) / 3600.0,
+                    bottoms_H_kW=float(B.H) / 3600.0,
+                    biosteam_reported_diameter_m=(
+                        float(d.get("Diameter", 0.0)) / BIOSTEAM_FT_PER_M or None),
+                    column_diameter_m=_true_diameter_m(col, d),
+                    feed_q=feed_q,
+                )
+        except Exception as exc:
+            return dataclasses.replace(
+                _EMPTY_COLUMN, error=f"{type(exc).__name__}: {exc}"
+            )
+
     def design_flash(self, feed: Feed, spec: FlashSpec) -> FlashResult:
         try:
             with contextlib.redirect_stdout(io.StringIO()):
