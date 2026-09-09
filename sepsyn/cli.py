@@ -205,6 +205,15 @@ def main(argv: list[str] | None = None) -> int:
                         "curve plotted with its optimum marked, the assumptions "
                         "it made, every rule, and the verification checks. No "
                         "network needed to open it")
+    p.add_argument("--sequence", action="store_true",
+                   help="enumerate every sharp-split sequence for a "
+                        "multicomponent feed, design each one, and report the "
+                        "cheapest. Requires --order")
+    p.add_argument("--order",
+                   help="component names lightest to heaviest, comma "
+                        "separated, e.g. 'Propane,Butane,Pentane'. Volatility "
+                        "order is what makes a split sharp, so it is required "
+                        "rather than guessed from boiling points")
     p.add_argument("--explain", action="store_true",
                    help="also print rules that did not fire, with their values")
     p.add_argument("--design", action="store_true",
@@ -261,6 +270,27 @@ def main(argv: list[str] | None = None) -> int:
             if args.html_path:
                 from sepsyn.htmlreport import write_html
                 write_html(args.html_path, payload)
+
+    if args.sequence:
+        if not args.order:
+            emit("\n--sequence requires --order, the component names from "
+                 "lightest to heaviest")
+            save()
+            return 2
+        order = tuple(n.strip() for n in args.order.split(","))
+        missing = [n for n in order if n not in feed.names]
+        if missing:
+            emit(f"\n--order names components that are not in the feed: "
+                 f"{', '.join(missing)}")
+            save()
+            return 2
+        from sepsyn.sequencing.rank import sweep
+        from sepsyn.sequencing.report import format_sequencing
+        from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
+        emit()
+        emit(format_sequencing(sweep(BioSteamSimulator(), feed, order)))
+        save()
+        return 0
 
     if args.design:
         if overall not in ("feasible", "caution"):
