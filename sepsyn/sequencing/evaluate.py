@@ -10,7 +10,7 @@ Because products propagate, the columns of a sequence must be solved in
 dependency order rather than independently. At the measured 0.01 s per column
 that costs nothing.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sepsyn.design import _annualised
 from sepsyn.sequencing.train import Node
@@ -37,6 +37,24 @@ class SequenceOutcome:
     total_cost_USD_yr: float | None
     total_vapour_kmol_hr: float | None
     eliminated_by: str
+    exposure: dict[str, float] = field(default_factory=dict)
+    """Tagged component -> kmol/hr of it summed over every column it enters.
+
+    FLOW WEIGHTED, not a column count, and the difference matters. A plain
+    count cannot tell 10 kmol/hr through three columns from a 0.1 kmol/hr trace
+    through three: sharp splits are imperfect, so a trace of every component
+    propagates almost everywhere and every count saturates. Measured on the
+    alkane train, tagging hexane gives a count of 3 for BOTH the direct
+    sequence, which carries it at full flow the whole way, and the indirect
+    one, which removes it at the first column. A metric that cannot separate
+    those two is useless for the trade-off it exists to show.
+
+    Weighting by flow separates them without inventing a threshold, which is
+    the whole reason exposure is counted rather than enforced."""
+    exposure_columns: dict[str, int] = field(default_factory=dict)
+    """Tagged component -> how many columns it appears in at all, trace
+    included. Reported alongside the flow-weighted figure for readability, and
+    never on its own."""
 
     @property
     def feasible(self) -> bool:
@@ -68,7 +86,9 @@ def _feed_from(flows: dict[str, float], order: tuple[str, ...],
 
 def evaluate_sequence(sim, feed: Feed, root: Node, *,
                       lk_recovery: float = 0.99,
-                      hk_recovery: float = 0.99) -> SequenceOutcome:
+                      hk_recovery: float = 0.99,
+                      tags: dict[str, frozenset[str]] | None = None
+                      ) -> SequenceOutcome:
     """Walk the tree, designing each column with the products of its parent."""
     from sepsyn.cli import resolve_column_pressure
     from sepsyn.engine import evaluate as evaluate_rules
@@ -79,6 +99,8 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
     cas = {c.name: c.cas for c in feed.components}
     order = feed.names          # master volatility order, lightest first
     columns: list[ColumnOutcome] = []
+    exposure: dict[str, float] = {}
+    exposure_columns: dict[str, int] = {}
     failure = ""
 
     def walk(node: Node, flows: dict[str, float]) -> None:
@@ -86,6 +108,21 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
         if node.is_leaf or failure:
             return
         group_feed = _feed_from(flows, order, feed.T_K, feed.P_Pa, cas)
+
+        # Exposure is COUNTED, never enforced. A threshold for how many columns
+        # a corrosive component may traverse would be invented, and a materials
+        # cost multiplier needs a factor the tool has no source for. Both bury
+        # an invented number inside a verdict. The count travels beside the cost
+        # and the reader resolves the trade-off.
+        #
+        # Counted from the ACTUAL stream, so a trace carried forward counts:
+        # propane nominally leaves at column one, but the 1% in its bottoms
+        # still reaches the metal downstream.
+        for tagged in (tags or {}):
+            entering = flows.get(tagged, 0.0)
+            if entering > 0.0:
+                exposure[tagged] = exposure.get(tagged, 0.0) + entering
+                exposure_columns[tagged] = exposure_columns.get(tagged, 0) + 1
         pressure, basis = resolve_column_pressure(group_feed, node.group[0], None)
         # Screen THIS column, not just the original feed. A pair that is well
         # behaved in the full mixture can be azeotropic once a component is
@@ -135,10 +172,13 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
     walk(root, {c.name: c.flow_kmol_hr for c in feed.components})
 
     if failure:
-        return SequenceOutcome(root, tuple(columns), None, None, failure)
+        return SequenceOutcome(root, tuple(columns), None, None, failure,
+                               exposure, exposure_columns)
     return SequenceOutcome(
         root, tuple(columns),
         sum(c.annualised_cost_USD_yr for c in columns),
         sum(c.vapour_kmol_hr for c in columns),
         "",
+        exposure,
+        exposure_columns,
     )

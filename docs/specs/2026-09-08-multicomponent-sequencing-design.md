@@ -302,8 +302,18 @@ disagree with.
   either value, and burying an invented number inside a verdict is precisely
   what this project exists to prevent.
 
-  Instead, exposure is counted and reported beside the cost. For every sequence,
-  how many columns each tagged component passes through. The output is a
+  Instead, exposure is measured and reported beside the cost, WEIGHTED BY FLOW:
+  for every sequence, the tagged component's molar flow summed over every
+  column it enters.
+
+  Flow weighting was forced by measurement, not chosen for elegance. A plain
+  column count saturates, because sharp splits are imperfect and a trace of
+  every component propagates almost everywhere. Tagging hexane on the alkane
+  train gives a count of three columns for BOTH the direct sequence, which
+  carries it at full flow the whole way, and the indirect one, which removes it
+  at the first column. A metric that cannot separate those two cannot show the
+  trade-off it exists for. Weighting by flow separates them roughly threefold
+  and still invents no threshold. The output is a
   trade-off the reader resolves: this route is cheapest and exposes three
   columns to HCl, that one costs eight percent more and exposes one.
 
