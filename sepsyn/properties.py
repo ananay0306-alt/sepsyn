@@ -206,7 +206,6 @@ def build_property_record(
         phase = "vapor"
     else:
         alphas = relative_volatilities(feed, P)
-        has_azeo = bool(find_azeotropes(list(feed.names), P))
         # The KEY PAIR when it is known, every pair when it is not.
         #
         # Same reasoning as bottoms_T_at_column_P below: before keys are named
@@ -223,6 +222,20 @@ def build_property_record(
         pair = ([light_key, heavy_key] if light_key and heavy_key
                 else list(feed.names))
         splits = find_liquid_split(pair, P) is not None
+        # The SAME pair the liquid-liquid check uses, and for the same reason.
+        # An azeotrope is a property of the separation being attempted, not of
+        # the mixture standing in the column. A column splitting acetone from
+        # ethanol, with water leaving in the bottoms beside the ethanol, is not
+        # attempting the ethanol/water separation and is not blocked by its
+        # azeotrope; whichever later column DOES take that pair as its keys
+        # will be blocked, and correctly so.
+        #
+        # These two checks were inconsistent: this one scanned every pair while
+        # find_liquid_split had already been narrowed to the keys. On a
+        # multicomponent train the difference eliminated every sequence at its
+        # first column and reported that no separation was possible, when only
+        # one of the splits was actually blocked.
+        has_azeo = bool(find_azeotropes(pair, P))
         phase = "vapor" if n_super > 0 else "liquid"
 
     # the most volatile component determines whether the condenser works

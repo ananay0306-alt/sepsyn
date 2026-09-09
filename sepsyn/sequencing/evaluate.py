@@ -71,7 +71,11 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
                       hk_recovery: float = 0.99) -> SequenceOutcome:
     """Walk the tree, designing each column with the products of its parent."""
     from sepsyn.cli import resolve_column_pressure
+    from sepsyn.engine import evaluate as evaluate_rules
+    from sepsyn.engine import load_rules, overall_verdict
+    from sepsyn.properties import build_property_record
 
+    rules = load_rules()
     cas = {c.name: c.cas for c in feed.components}
     order = feed.names          # master volatility order, lightest first
     columns: list[ColumnOutcome] = []
@@ -83,6 +87,26 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
             return
         group_feed = _feed_from(flows, order, feed.T_K, feed.P_Pa, cas)
         pressure, basis = resolve_column_pressure(group_feed, node.group[0], None)
+        # Screen THIS column, not just the original feed. A pair that is well
+        # behaved in the full mixture can be azeotropic once a component is
+        # removed, and a sequence that creates such a pair partway down the
+        # train has to be eliminated there rather than costed as if it worked.
+        record = build_property_record(
+            group_feed, column_P_Pa=pressure,
+            light_key=node.light_key, heavy_key=node.heavy_key,
+            column_P_basis=basis)
+        verdicts = evaluate_rules(rules, record)
+        verdict = overall_verdict(verdicts)
+        if verdict == "infeasible":
+            fired = ", ".join(v.rule_id for v in verdicts
+                              if v.fired and v.verdict == "infeasible")
+            failure = (f"column {node.light_key}/{node.heavy_key} screens "
+                       f"INFEASIBLE ({fired})")
+            columns.append(ColumnOutcome(node, pressure, basis, None,
+                                         None, None, screening=verdict,
+                                         eliminated_by=failure))
+            return
+
         spec = ColumnSpec(node.light_key, node.heavy_key,
                           lk_recovery, hk_recovery, pressure)
         result = sim.design_multicomponent(group_feed, spec)
@@ -91,7 +115,8 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
                        f"{'+'.join(node.heavy_group)} did not converge: "
                        f"{result.error}")
             columns.append(ColumnOutcome(node, pressure, basis, result,
-                                         None, None, eliminated_by=failure))
+                                         None, None, screening=verdict,
+                                         eliminated_by=failure))
             return
         D = sum(result.distillate.values())
         columns.append(ColumnOutcome(
@@ -102,6 +127,7 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
             # Vapour to the condenser, the spec's cost surrogate. Defined once
             # there and pinned by a test here so the two cannot drift.
             vapour_kmol_hr=D * (result.reflux + 1.0),
+            screening=verdict,
         ))
         walk(node.light, dict(result.distillate))
         walk(node.heavy, dict(result.bottoms))
