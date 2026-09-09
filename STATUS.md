@@ -9,8 +9,8 @@ Updated 2026-09-08. Check this file; it is the tracker.
 |---|---|
 | Milestones done | **1 of 6**, plus the heuristics fold-in and **M3 COMPLETE** |
 | Tests | **251 passing**, 19 s |
-| Blocking right now | **Risk 5**, re-tested and confirmed genuine. M2 needs a new acceptance case |
-| Waiting on you | **2 decisions** (below). M2 does not move until these are made. |
+| Blocking right now | nothing. M2 unblocked 09-09, spec revised, not yet planned |
+| Waiting on you | nothing. All M2 decisions ruled 09-09 |
 | Published | **public** at github.com/ananay0306-alt/sepsyn, MIT |
 
 ## Environment: FIXED 2026-08-30
@@ -63,9 +63,35 @@ instead of only a verdict.
       refute it has run
 - Done now because it makes M4 a default-valued field instead of a migration
 
-### [ ] M2 — rigorous cross-validation · BLOCKED, NOT PLANNED
+### [ ] M2 — rigorous cross-validation · UNBLOCKED, NOT PLANNED
 How far is sepsyn's shortcut design from a rigorous answer? DWSIM's rigorous
 column is the REFERENCE, not a peer, so the gap measures shortcut error.
+
+**Unblocked 2026-09-09.** All three decisions ruled: staged bring-up
+(benzene/toluene first, four-component alkane as the target), both transports
+(fixtures plus opt-in live), and multicomponent as the goal since M3 landed
+after the old spec was written. Current spec:
+`docs/specs/2026-09-09-milestone-2-configuration-equivalence.md`.
+
+**A live probe on 09-09 changed what the milestone is.** The rigorous
+4-component column CONVERGES, so Risk 5 does not recur. But three configuration
+conventions turned out to be unpinned, and until they are, no reported gap can
+be interpreted:
+
+| convention | evidence |
+|---|---|
+| stage basis, theoretical vs actual | 28 vs 20 caused outright non-convergence |
+| feed stage numbering, top vs bottom | flips convergence: stage 14 solved in seconds, stage 6 timed out at 300 s |
+| whether a stage count includes condenser and reboiler | unresolved, and confounded with the above |
+
+The probe measured an 11x condenser duty gap and it is deliberately NOT
+reported as shortcut error, because it cannot be distinguished from a feed
+stage convention mismatch. Naming it would repeat the 08-27 mistake exactly.
+
+It also found that the DWSIM flowsheet cannot be mutated: disconnect reported
+success, left the feed attached, and the next solve ran a silently DOUBLED feed
+with entirely plausible numbers. The adapter must build a fresh flowsheet per
+run, and every comparison must assert a mass balance.
 - [x] Scope A ruled
 - [x] Risk 2 resolved — `ShortcutColumn` spec inputs are public *fields*
 - [x] Found: the old acceptance criterion could not fail — recoveries impose

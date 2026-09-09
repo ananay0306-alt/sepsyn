@@ -1,5 +1,13 @@
 # sepsyn milestone 2 (revised) — rigorous cross-validation
 
+> **SUPERSEDED 2026-09-09** by
+> `2026-09-09-milestone-2-configuration-equivalence.md`. The THESIS below is
+> carried forward unchanged and is still the argument for the milestone. The
+> SCOPE is replaced: M3 landed afterwards, making the multicomponent path the
+> target rather than the binary one, and a probe established that the hard part
+> is asserting configuration equivalence rather than performing the comparison.
+> This document stands as the record of what was believed on 2026-08-27.
+
 **Status: draft spec, not yet planned into tasks. Supersedes the SCOPE of
 `2026-08-22-milestone-2-dwsim-crossvalidation.md`.** That document stands
 unchanged as the record of what was believed on 2026-08-22 and as the evidence
