@@ -88,3 +88,65 @@ def score_proxies(feed, order: tuple[str, ...], ranking: Ranking,
             sequence_status=kind,
         ))
     return Scorecard(tuple(scores), winner_name, len(chosen) == 1)
+
+
+@dataclass(frozen=True)
+class VminProxyScore:
+    """A textbook heuristic, scored against a THERMODYNAMIC bound.
+
+    `score_proxies` above grades proxies against sepsyn's own cost ranking,
+    which is circular: an unvalidated ruler measuring itself. Minimum vapour is
+    not from the same family. It is an exact requirement derived from
+    Underwood, it needs no cost data, and it does not depend on any of the
+    layers -- Gilliland, tray efficiency, condenser type, diameter, cost
+    correlation -- that the 09-09 and 09-10 measurements found wanting.
+    """
+    name: str
+    sequence_name: str
+    total_V_min_kmol_hr: float | None
+    excess: float | None
+    """Fraction ABOVE the optimum's total vapour. 0.0 means the proxy found the
+    optimum. None when its sequence contains a split that cannot be made."""
+    note: str = ""
+
+
+def total_vmin_of(root, order, alpha, flows, q, downstream_q=1.0,
+                  alpha_basis=""):
+    """Total minimum vapour of an ARBITRARY sequence tree.
+
+    Used to price a heuristic's choice on the same basis the dynamic program
+    used for its own, which is the only way the comparison means anything. q
+    is charged to the root split alone; every other column is fed a saturated
+    product of the column above it.
+    """
+    from sepsyn.vmin.vapour import minimum_vapour
+
+    root_group = tuple(order)
+    total = 0.0
+    for node in root.splits():
+        sub = {c: flows[c] for c in node.group}
+        group_q = q if node.group == root_group else downstream_q
+        total += minimum_vapour(node.group, alpha, sub, group_q, node.k,
+                                alpha_basis).V_min_kmol_hr
+    return total
+
+
+def score_proxies_against_vmin(feed, order, alpha, flows, q, optimum,
+                               P_Pa, downstream_q=1.0):
+    """Every proxy, priced in vapour against the provable optimum."""
+    from sepsyn.vmin.underwood import NoUnderwoodRoot
+
+    alphas = adjacent_alphas(feed, order, P_Pa)
+    best = optimum.total_V_min_kmol_hr
+    out = []
+    for name, proxy in PROXIES.items():
+        root = proxy(tuple(order), flows, alphas)
+        try:
+            total = total_vmin_of(root, order, alpha, flows, q, downstream_q)
+        except NoUnderwoodRoot as exc:
+            out.append(VminProxyScore(name, label(root), None, None,
+                                      note=f"not computable: {exc}"))
+            continue
+        out.append(VminProxyScore(name, label(root), total,
+                                  total / best - 1.0 if best else None))
+    return tuple(out)

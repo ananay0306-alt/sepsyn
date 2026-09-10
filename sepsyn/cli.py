@@ -213,6 +213,12 @@ def main(argv: list[str] | None = None) -> int:
                         "curve plotted with its optimum marked, the assumptions "
                         "it made, every rule, and the verification checks. No "
                         "network needed to open it")
+    p.add_argument("--vmin", action="store_true",
+                   help="choose the separation sequence by MINIMUM VAPOUR, "
+                        "found exactly by dynamic programming rather than by "
+                        "enumerating and costing. Needs no cost data, scales "
+                        "to a dozen components, and returns the provable "
+                        "optimum. Requires --order")
     p.add_argument("--sequence", action="store_true",
                    help="enumerate every sharp-split sequence for a "
                         "multicomponent feed, design each one, and report the "
@@ -282,6 +288,45 @@ def main(argv: list[str] | None = None) -> int:
             if args.html_path:
                 from sepsyn.htmlreport import write_html
                 write_html(args.html_path, payload)
+
+    if args.vmin:
+        if not args.order:
+            emit("\n--vmin requires --order, the component names from "
+                 "lightest to heaviest")
+            save()
+            return 2
+        order = tuple(n.strip() for n in args.order.split(","))
+        missing = [n for n in order if n not in feed.names]
+        if missing:
+            emit(f"\n--vmin --order names components that are not in the "
+                 f"feed: {', '.join(missing)}")
+            save()
+            return 2
+        from sepsyn.feed_condition import feed_condition
+        from sepsyn.sequencing.score import score_proxies_against_vmin
+        from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
+        from sepsyn.vmin.pipeline import select_and_verify, volatilities_for
+        from sepsyn.vmin.report import format_vmin
+        from sepsyn.vmin.sequence import NoFeasibleSequence
+
+        column_P, _ = resolve_column_pressure(feed, order[0], args.column_P)
+        try:
+            selection, outcome = select_and_verify(
+                BioSteamSimulator(), feed, order, column_P)
+        except (NoFeasibleSequence, ValueError) as exc:
+            emit(f"\nNo sequence could be selected: {exc}")
+            save()
+            return 1
+        alpha, _ = volatilities_for(feed, column_P)
+        flows = {c.name: c.flow_kmol_hr for c in feed.components}
+        fc = feed_condition(feed, column_P)
+        q = fc.q if fc is not None else 1.0
+        scores = score_proxies_against_vmin(
+            feed, order, alpha, flows, q, selection, column_P)
+        emit()
+        emit(format_vmin(selection, outcome, scores, order))
+        save()
+        return 0
 
     if args.sequence:
         if not args.order:
