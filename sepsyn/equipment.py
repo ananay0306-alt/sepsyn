@@ -28,6 +28,8 @@ EQUIPMENT_VISIBLE_FIELDS = frozenset({
     "n_supercritical_at_feed",
     "min_alpha",
     "bottoms_T_at_column_P",
+    "condensing_T_at_column_P",
+    "cooling_water_T",
     "feed_q",
     "stages",
     "column_diameter_m",
@@ -47,6 +49,11 @@ class DesignContext:
     n_supercritical_at_feed: int
     min_alpha: float | None = None
     bottoms_T_at_column_P: float | None = None
+    condensing_T_at_column_P: float | None = None
+    """Condensing temperature of the lightest component AT THIS COLUMN'S
+    pressure. E-22a keys on it: a component condensable in the feed may not be
+    condensable in a downstream column running lower."""
+    cooling_water_T: float = 313.15
     feed_q: float | None = None
     stages: float | None = None
     column_diameter_m: float | None = None

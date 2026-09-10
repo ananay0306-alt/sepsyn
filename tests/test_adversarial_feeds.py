@@ -54,27 +54,33 @@ def test_at_least_two_proxies_name_different_sequences(middle_heavy):
     assert len({s.sequence_name for s in card.scores}) >= 2
 
 
-def test_the_scorecard_says_which_proxy_was_right(middle_heavy):
-    """The answer to the review question, on this feed. Measured, not argued:
-    the volatility heuristics beat the flow-based ones here."""
+def test_the_scorecard_says_what_became_of_each_proxys_choice(middle_heavy):
+    """Corrected 2026-09-10. This previously asserted easiest_first picked the
+    winner and most_plentiful_first did not, a result computed while
+    undetermined columns were being costed.
+
+    The proxies still disagree with each other, which is what makes the feed
+    adversarial. What changed is that NONE of their choices is costable: they
+    all route light traces into low-pressure condensers. The scorecard now
+    reports that as its own status rather than as a cost penalty.
+    """
     _, _, card = middle_heavy
-    hits = {s.name for s in card.scores if s.picked_winner}
-    misses = {s.name for s in card.scores if not s.picked_winner}
-    assert hits, "no proxy picked the winner, which is itself a finding"
-    assert misses, "if every proxy is right the feed is not adversarial"
-    assert "easiest_first" in hits
-    assert "most_plentiful_first" in misses
+    assert len({s.sequence_name for s in card.scores}) >= 2
+    assert not any(s.picked_winner for s in card.scores)
+    assert all(s.sequence_status in ("undetermined", "eliminated")
+               for s in card.scores)
 
 
-def test_being_wrong_is_QUANTIFIED_not_merely_recorded(middle_heavy):
-    """A miss must carry what it cost. 'This heuristic is wrong' is an
-    opinion; 'this heuristic costs 12% more' is a measurement."""
+def test_a_miss_is_EXPLAINED_rather_than_left_blank(middle_heavy):
+    """A miss must say what became of the choice. A blank penalty could mean
+    'wrong by an unknown amount' or 'named something unbuildable', and those
+    are different things for a reader to act on."""
     _, _, card = middle_heavy
     for s in card.scores:
         if not s.picked_winner:
-            assert s.cost_penalty is not None, (
-                "a proxy naming a feasible sequence must report its penalty")
-            assert s.cost_penalty > 0
+            assert s.sequence_status != "unknown"
+            if s.sequence_status in ("costable", "near-optimal"):
+                assert s.cost_penalty is not None and s.cost_penalty > 0
 
 
 def test_the_disagreement_is_recorded_against_the_ground_truth(middle_heavy):

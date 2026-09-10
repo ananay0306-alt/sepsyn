@@ -92,13 +92,17 @@ def test_sweep_evaluates_every_sequence_for_a_real_feed():
     assert r.winner.total_cost_USD_yr > 0
 
 
-def test_the_direct_sequence_wins_on_this_feed():
-    """Known answer. Propane is both lightest and most plentiful, so removing
-    it first is favoured by every classic heuristic, and it wins on cost.
+def test_the_INDIRECT_sequence_wins_once_undetermined_columns_block():
+    """Corrected 2026-09-10. This previously asserted the DIRECT sequence won.
 
-    NOTE: precisely because every heuristic agrees here, this case cannot
-    discriminate between them. That is why Phase B needs an adversarial test
-    set. See spec section 5.
+    Four of the five sequences send light traces into low-pressure condensers,
+    R-09 fires, and they are undetermined rather than costable. The survivor
+    removes the heaviest component first, keeping the light ends together in
+    high-pressure columns.
+
+    The direct sequence was formerly reported as the winner at $462,010/yr on
+    this feed, computed from columns the tool had itself flagged.
     """
     r = sweep(BioSteamSimulator(), alkane_feed(), ORDER)
-    assert r.winner.name.startswith("Propane/Butane+Pentane+Hexane")
+    assert len(r.undetermined) == 4
+    assert r.winner.name.startswith("Propane+Butane+Pentane/Hexane")

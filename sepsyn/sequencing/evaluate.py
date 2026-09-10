@@ -37,6 +37,16 @@ class SequenceOutcome:
     total_cost_USD_yr: float | None
     total_vapour_kmol_hr: float | None
     eliminated_by: str
+    undetermined_by: str = ""
+    """Non-empty when a column screened `undetermined`. Such a sequence is NOT
+    eliminated, but it carries no cost.
+
+    An undetermined verdict means a rule fired and cannot be acted on until a
+    calculation is done. Costing the train anyway is a confident answer about
+    something unverified, and that is the failure this project exists to
+    prevent. It was committed here: two of three columns in the reported
+    winning sequence were flagged and it was ranked at $513,461/yr regardless,
+    on columns a rigorous solve could not converge."""
     exposure: dict[str, float] = field(default_factory=dict)
     """Tagged component -> kmol/hr of it summed over every column it enters.
 
@@ -58,7 +68,16 @@ class SequenceOutcome:
 
     @property
     def feasible(self) -> bool:
+        """Not ruled out. Undetermined sequences are still feasible: they may
+        be perfectly good once a partial condenser or a light-ends vent is
+        confirmed, and eliminating them would hide a viable route."""
         return not self.eliminated_by
+
+    @property
+    def costable(self) -> bool:
+        """Feasible AND fully determined. Only these may carry a cost or enter
+        a ranking."""
+        return self.feasible and not self.undetermined_by
 
     @property
     def name(self) -> str:
@@ -99,6 +118,7 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
     cas = {c.name: c.cas for c in feed.components}
     order = feed.names          # master volatility order, lightest first
     columns: list[ColumnOutcome] = []
+    undetermined: list[str] = []
     exposure: dict[str, float] = {}
     exposure_columns: dict[str, int] = {}
     failure = ""
@@ -134,6 +154,15 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
             column_P_basis=basis)
         verdicts = evaluate_rules(rules, record)
         verdict = overall_verdict(verdicts)
+        if verdict == "undetermined":
+            # Recorded and ALLOWED TO BLOCK. Previously this was stored on the
+            # ColumnOutcome and ignored, so a sequence containing a column the
+            # tool declined to endorse was costed and ranked anyway.
+            fired = ", ".join(v.rule_id for v in verdicts
+                              if v.fired and v.verdict == "undetermined")
+            undetermined.append(
+                f"column {node.light_key}/{node.heavy_key} is UNDETERMINED "
+                f"({fired})")
         if verdict == "infeasible":
             fired = ", ".join(v.rule_id for v in verdicts
                               if v.fired and v.verdict == "infeasible")
@@ -172,12 +201,19 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
     walk(root, {c.name: c.flow_kmol_hr for c in feed.components})
 
     if failure:
-        return SequenceOutcome(root, tuple(columns), None, None, failure,
+        return SequenceOutcome(root, tuple(columns), None, None, failure, "",
+                               exposure, exposure_columns)
+    if undetermined:
+        # Designed, but not costed. The per-column results stay so a reader can
+        # see what was rejected and why.
+        return SequenceOutcome(root, tuple(columns), None, None, "",
+                               "; ".join(undetermined),
                                exposure, exposure_columns)
     return SequenceOutcome(
         root, tuple(columns),
         sum(c.annualised_cost_USD_yr for c in columns),
         sum(c.vapour_kmol_hr for c in columns),
+        "",
         "",
         exposure,
         exposure_columns,

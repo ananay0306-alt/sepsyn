@@ -18,10 +18,20 @@ def _wrap(prefix: str, text: str) -> list[str]:
 
 def format_sequencing(ranking: Ranking, scorecard=None, tags=None) -> str:
     lines: list[str] = []
-    feasible = ranking.evaluated - len(ranking.eliminated)
+    costable = len(ranking.all_feasible)
+    feasible = costable
     lines.append("SEQUENCES")
-    lines.append(f"  {ranking.evaluated} sequences enumerated, "
-                 f"{feasible} designable, {len(ranking.eliminated)} eliminated")
+    lines.append(f"  {ranking.evaluated} enumerated, {costable} costable, "
+                 f"{len(ranking.undetermined)} undetermined, "
+                 f"{len(ranking.eliminated)} eliminated")
+    if ranking.undetermined and costable <= 1:
+        # Say it plainly. A reader seeing "BEST SEQUENCE" naturally assumes it
+        # beat the others; here it was the only candidate.
+        lines.extend(_wrap(
+            "  ",
+            f"Only {costable} of {ranking.evaluated} could be costed, so the "
+            f"best sequence below was not chosen over the others. It is the "
+            f"only one the tool can stand behind."))
     lines.append("")
 
     if ranking.winner is None:
@@ -109,12 +119,29 @@ def format_sequencing(ranking: Ranking, scorecard=None, tags=None) -> str:
         for s in sorted(scorecard.scores, key=lambda x: x.name):
             if s.picked_winner:
                 verdict = "picked the winner"
+            elif s.sequence_status == "undetermined":
+                verdict = "named a sequence the tool cannot endorse"
+            elif s.sequence_status == "eliminated":
+                verdict = "named a sequence that was eliminated"
             elif s.cost_penalty is None:
-                verdict = "named a sequence that could not be designed"
+                verdict = "named a sequence that could not be costed"
             else:
                 verdict = f"{s.cost_penalty:+.1%} worse than the winner"
             lines.append(f"    {s.name:<22} {verdict}")
             lines.extend(_wrap("      ", s.sequence_name))
+
+    if ranking.undetermined:
+        lines.append("")
+        lines.append("UNDETERMINED  (designed, but NOT costed or ranked)")
+        lines.extend(_wrap(
+            "  ",
+            "A rule fired on one of these columns and cannot be acted on until "
+            "a calculation is done, so no cost is reported. These are not ruled "
+            "out: each may be perfectly good once the named question is "
+            "settled."))
+        for o in ranking.undetermined:
+            lines.append(f"    {o.name}")
+            lines.extend(_wrap("      ", o.undetermined_by))
 
     if ranking.eliminated:
         lines.append("")

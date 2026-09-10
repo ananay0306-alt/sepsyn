@@ -196,3 +196,42 @@ def test_a_rule_naming_a_property_that_does_not_exist_is_rejected(tmp_path):
     )
     with pytest.raises(ValueError, match="liquid_viscosity"):
         load_equipment_rules(str(bad))
+
+
+def test_E22a_fires_when_the_overhead_will_not_condense_AT_THIS_PRESSURE():
+    """Corrected 2026-09-10. E-22a previously keyed only on the supercritical
+    count at FEED conditions, which is silent in the case that matters.
+
+    A propane trace reaching a downstream column at 1.16 bar condenses at
+    234 K against cooling water at 313 K. Propane is not supercritical at the
+    330 K feed, so the old condition never fired, and sepsyn specified a total
+    condenser that a rigorous solve could not converge.
+    """
+    context = DesignContext(
+        pressure_Pa=1.16e5, n_supercritical_at_feed=0,
+        condensing_T_at_column_P=234.1, cooling_water_T=313.15,
+        column_diameter_m=1.5)
+    d = decisions_for(context)[22]
+    assert d.choice == "partial"
+    assert d.status == "decided"
+    assert d.rule_id == "E-22a"
+
+
+def test_E22a_still_fires_on_a_supercritical_component():
+    """The original trigger must survive. A supercritical component has no
+    condensing temperature at all, so the comparison against None is false and
+    the second clause has to carry it."""
+    context = DesignContext(
+        pressure_Pa=ATM, n_supercritical_at_feed=1,
+        condensing_T_at_column_P=None, cooling_water_T=313.15)
+    assert decisions_for(context)[22].choice == "partial"
+
+
+def test_E22a_stays_quiet_when_the_overhead_condenses_comfortably():
+    context = DesignContext(
+        pressure_Pa=ATM, n_supercritical_at_feed=0,
+        condensing_T_at_column_P=353.2, cooling_water_T=313.15,
+        column_diameter_m=1.15)
+    d = decisions_for(context)[22]
+    assert d.choice == "total"
+    assert d.status == "default"

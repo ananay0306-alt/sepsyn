@@ -25,6 +25,9 @@ class Ranking:
     winner: SequenceOutcome | None
     near_optimal: tuple[SequenceOutcome, ...]
     eliminated: tuple[SequenceOutcome, ...]
+    undetermined: tuple[SequenceOutcome, ...]
+    """Feasible but uncostable: a column screened undetermined. Reported, never
+    ranked. See SequenceOutcome.undetermined_by."""
     metrics_agree_on_winner: bool
     orderings_identical: bool
     worst_displacement: int
@@ -41,10 +44,13 @@ class Ranking:
 
 def rank(outcomes: list[SequenceOutcome],
          tolerance: float = NEAR_OPTIMAL_TOLERANCE) -> Ranking:
-    feasible = [o for o in outcomes if o.feasible]
+    feasible = [o for o in outcomes if o.costable]
     eliminated = tuple(o for o in outcomes if not o.feasible)
+    undetermined = tuple(o for o in outcomes
+                         if o.feasible and not o.costable)
     if not feasible:
-        return Ranking(None, (), eliminated, True, True, 0, len(outcomes))
+        return Ranking(None, (), eliminated, undetermined, True, True, 0,
+                       len(outcomes))
 
     by_cost = sorted(feasible, key=lambda o: o.total_cost_USD_yr)
     by_vapour = sorted(feasible, key=lambda o: o.total_vapour_kmol_hr)
@@ -60,6 +66,7 @@ def rank(outcomes: list[SequenceOutcome],
         winner=winner,
         near_optimal=near,
         eliminated=eliminated,
+        undetermined=undetermined,
         all_feasible=tuple(by_cost),
         metrics_agree_on_winner=(by_cost[0] is by_vapour[0]),
         orderings_identical=(displacement == 0),

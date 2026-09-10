@@ -32,18 +32,23 @@
   rules:
     - id: E-22a
       priority: 10
-      when: "n_supercritical_at_feed > 0"
+      when: "condensing_T_at_column_P < cooling_water_T or n_supercritical_at_feed > 0"
       choice: partial
       because: >-
-        a component that cannot be condensed at feed conditions will not
-        condense in the overhead either; a total condenser would either fail to
-        condense or need refrigeration, so the light material leaves as vapour
+        something in the overhead will not condense against cooling water at
+        this column's pressure, so a total condenser would either fail or need
+        refrigeration and the light material must leave as vapour
       cite: "Towler & Sinnott, Chemical Engineering Design, Ch.17"
       limitations: >-
-        this reads the supercritical count at FEED conditions, and the
-        condenser runs at the overhead composition and the column pressure.
-        Raising the pressure can bring a marginal component back into the
-        liquid, which would restore the total condenser
+        corrected 2026-09-10. This previously fired only on the supercritical
+        count at FEED conditions, which missed the case that matters in a
+        train: a component perfectly condensable in the feed but not at a
+        downstream column's lower pressure. On an alkane sequence a propane
+        trace reaches a 1.16 bar condenser where it condenses at 234 K against
+        cooling water at 313 K, and the old condition stayed silent because
+        propane is not supercritical at 330 K. Raising the pressure can still
+        bring a marginal component back into the liquid, which would restore
+        the total condenser
 
 - step: 23
   decision: reboiler_type

@@ -40,27 +40,62 @@ def direct_sequence():
     )
 
 
+def indirect_sequence():
+    """Heaviest off first. The only shape that stays COSTABLE on an alkane
+    feed: removing the heavy end first keeps the light components together in
+    high-pressure columns where their condensers actually work. The direct
+    sequence sends light traces into a 1.16 bar condenser and R-09 fires."""
+    return Node(
+        group=ORDER, k=3,
+        light=Node(group=("Propane", "Butane", "Pentane"), k=2,
+                   light=Node(group=("Propane", "Butane"), k=1,
+                              light=Node(group=("Propane",)),
+                              heavy=Node(group=("Butane",))),
+                   heavy=Node(group=("Pentane",))),
+        heavy=Node(group=("Hexane",)),
+    )
+
+
 @pytest.fixture(scope="module")
 def outcome():
+    """The direct sequence. Designed, and UNDETERMINED: two of its columns
+    receive light traces their condensers cannot handle."""
     return evaluate_sequence(BioSteamSimulator(), alkane_feed(), direct_sequence())
+
+
+@pytest.fixture(scope="module")
+def costable():
+    return evaluate_sequence(BioSteamSimulator(), alkane_feed(),
+                             indirect_sequence())
 
 
 def test_a_sequence_of_four_components_has_three_columns(outcome):
     assert len(outcome.columns) == 3
 
 
-def test_it_reports_a_total_cost_and_a_total_vapour_load(outcome):
-    assert outcome.feasible, outcome.eliminated_by
-    assert outcome.total_cost_USD_yr > 0
-    assert outcome.total_vapour_kmol_hr > 0
+def test_it_reports_a_total_cost_and_a_total_vapour_load(costable):
+    assert costable.costable, costable.undetermined_by
+    assert costable.total_cost_USD_yr > 0
+    assert costable.total_vapour_kmol_hr > 0
 
 
-def test_the_total_is_the_sum_of_the_columns(outcome):
+def test_the_direct_sequence_is_designed_but_NOT_costed(outcome):
+    """It is feasible and every column has a design, but two columns screened
+    undetermined so no cost is reported. Previously this train was costed and
+    ranked as though nothing had been flagged."""
+    assert outcome.feasible is True
+    assert outcome.costable is False
+    assert outcome.total_cost_USD_yr is None
+    assert "R-09" in outcome.undetermined_by
+    assert all(c.result is not None for c in outcome.columns)
+
+
+def test_the_total_is_the_sum_of_the_columns(costable):
     """A total that is not the sum of its parts cannot be audited."""
-    assert outcome.total_cost_USD_yr == pytest.approx(
-        sum(c.annualised_cost_USD_yr for c in outcome.columns))
-    assert outcome.total_vapour_kmol_hr == pytest.approx(
-        sum(c.vapour_kmol_hr for c in outcome.columns))
+    assert costable.total_cost_USD_yr == pytest.approx(
+        sum(c.annualised_cost_USD_yr for c in costable.columns))
+    assert costable.total_vapour_kmol_hr == pytest.approx(
+        sum(c.vapour_kmol_hr for c in costable.columns))
 
 
 def test_PRODUCTS_PROPAGATE_rather_than_ideal_flows_being_reused(outcome):

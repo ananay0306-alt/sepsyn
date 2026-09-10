@@ -23,6 +23,14 @@ class ProxyScore:
     """Fraction above the winner's cost. None when the proxy named a sequence
     that could not be designed, or when nothing could be."""
     cost_USD_yr: float | None
+    sequence_status: str = "unknown"
+    """What the ranking made of the sequence this proxy named: winner,
+    near-optimal, costable, undetermined, eliminated, or unknown.
+
+    'undetermined' is the case that matters and it did not exist before
+    2026-09-10: a heuristic can recommend a route the tool declines to endorse,
+    which is a stronger statement than saying the heuristic is wrong. On the
+    alkane feeds every classic proxy does exactly that."""
 
 
 @dataclass(frozen=True)
@@ -45,6 +53,8 @@ def score_proxies(feed, order: tuple[str, ...], ranking: Ranking,
     # that could not be built, and both show as no penalty at all.
     costs = {o.name: o.total_cost_USD_yr for o in ranking.all_feasible}
     near = {o.name for o in ranking.near_optimal}
+    status = {o.name: "undetermined" for o in ranking.undetermined}
+    status.update({o.name: "eliminated" for o in ranking.eliminated})
     if ranking.winner is not None:
         costs.setdefault(ranking.winner.name, ranking.winner.total_cost_USD_yr)
         near.add(ranking.winner.name)
@@ -60,6 +70,14 @@ def score_proxies(feed, order: tuple[str, ...], ranking: Ranking,
         cost = costs.get(picked)
         penalty = (None if (cost is None or not winner_cost)
                    else cost / winner_cost - 1.0)
+        if bool(winner_name) and picked == winner_name:
+            kind = "winner"
+        elif picked in near:
+            kind = "near-optimal"
+        elif picked in costs:
+            kind = "costable"
+        else:
+            kind = status.get(picked, "unknown")
         scores.append(ProxyScore(
             name=name,
             sequence_name=picked,
@@ -67,5 +85,6 @@ def score_proxies(feed, order: tuple[str, ...], ranking: Ranking,
             within_near_optimal=picked in near,
             cost_penalty=penalty,
             cost_USD_yr=cost,
+            sequence_status=kind,
         ))
     return Scorecard(tuple(scores), winner_name, len(chosen) == 1)

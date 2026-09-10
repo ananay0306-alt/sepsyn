@@ -104,7 +104,8 @@ def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
 
     from sepsyn.design import best_point, recoveries_for_purity, sweep_reflux
     from sepsyn.equipment import DesignContext, choose_equipment
-    from sepsyn.properties import condensing_temperature, count_supercritical
+    from sepsyn.properties import (COOLING_WATER_T, boiling_point,
+                                   condensing_temperature, count_supercritical)
     from sepsyn.simulators.base import ColumnResult, ColumnSpec
     from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
     from sepsyn.verify import verify_column
@@ -129,8 +130,13 @@ def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
     # diameter that does not exist until the column has been sized.
     n_super = count_supercritical(feed)
     bottoms_T = condensing_temperature(heavy_key, pressure)
+    lightest = min(feed.components, key=lambda c: boiling_point(c.cas))
     before = DesignContext(pressure_Pa=pressure, n_supercritical_at_feed=n_super,
-                           bottoms_T_at_column_P=bottoms_T, feed_q=feed_q)
+                           bottoms_T_at_column_P=bottoms_T,
+                           condensing_T_at_column_P=condensing_temperature(
+                               lightest.name, pressure),
+                           cooling_water_T=COOLING_WATER_T,
+                           feed_q=feed_q)
     condenser = next(d for d in choose_equipment(before) if d.step == 22)
 
     spec = ColumnSpec(light_key, heavy_key, lk_recovery, hk_recovery, pressure,
@@ -149,6 +155,8 @@ def design_if_feasible(feed: Feed, light_key: str, heavy_key: str,
         after = DesignContext(
             pressure_Pa=pressure, n_supercritical_at_feed=n_super,
             bottoms_T_at_column_P=bottoms_T,
+            condensing_T_at_column_P=before.condensing_T_at_column_P,
+            cooling_water_T=COOLING_WATER_T,
             feed_q=result.feed_q if result is not None else feed_q,
             stages=result.stages if result is not None else None,
             column_diameter_m=(result.column_diameter_m

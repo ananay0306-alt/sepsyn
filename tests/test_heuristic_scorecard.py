@@ -41,11 +41,19 @@ def test_each_score_names_the_sequence_that_proxy_chose(card):
         assert s.sequence_name
 
 
-def test_a_proxy_that_picked_the_winner_is_marked_as_such(card):
-    """On this alkane feed every heuristic picks the same sequence and it
-    wins, so all four should score a hit. That is exactly why this feed cannot
-    discriminate between them, which is the adversarial set's job."""
-    assert all(s.picked_winner for s in card.scores)
+def test_every_classic_heuristic_names_a_route_the_tool_CANNOT_ENDORSE(card):
+    """Corrected 2026-09-10. This previously asserted all four proxies picked
+    the winner, which they did while undetermined columns were being costed.
+
+    All four favour taking the lightest component off first. That route sends
+    light traces into low-pressure condensers, R-09 fires, and the sequence is
+    undetermined. So every textbook heuristic recommends a train sepsyn
+    declines to endorse, and none of them picks the survivor.
+
+    That is a finding about the heuristics, not a failure of the scorecard.
+    """
+    assert not any(s.picked_winner for s in card.scores)
+    assert all(s.sequence_status == "undetermined" for s in card.scores)
     assert card.proxies_agree is True
 
 

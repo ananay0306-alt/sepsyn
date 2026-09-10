@@ -14,8 +14,13 @@ def test_it_runs_and_returns_zero(capsys):
 
 
 def test_it_reports_how_many_sequences_it_evaluated(capsys):
+    """Wording changed 2026-09-10: the header now separates costable from
+    undetermined, because on an alkane feed four of five sequences are
+    designed but not costable and a single count hid that."""
     main(ALKANES)
-    assert "5 sequences" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "5 enumerated" in out
+    assert "costable" in out and "undetermined" in out
 
 
 def test_it_names_the_winner_with_its_cost(capsys):

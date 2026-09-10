@@ -15,14 +15,37 @@ def test_the_scorecard_is_printed(capsys):
         assert name in out
 
 
-def test_it_says_which_heuristic_picked_the_winner(capsys):
+def test_it_says_what_became_of_each_heuristics_choice(capsys):
+    """Corrected 2026-09-10. On this feed every proxy names an undetermined
+    route, so the report says so rather than quoting a cost penalty against a
+    winner none of them chose."""
     main(BASE)
-    assert "picked the winner" in capsys.readouterr().out.lower()
+    out = capsys.readouterr().out
+    assert "cannot endorse" in out
 
 
-def test_a_wrong_heuristic_shows_what_it_cost(capsys):
+def test_the_report_names_the_undetermined_sequences(capsys):
+    """Asserted against the SEQUENCING section specifically. An earlier version
+    checked the whole output and passed on the word 'UNDETERMINED' appearing in
+    the feed-level screening report above, while the sequencing section
+    mentioned nothing at all."""
     main(BASE)
-    assert "worse than the winner" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    seq = out[out.index("SEQUENCES"):]
+    assert "UNDETERMINED  (designed, but NOT costed or ranked)" in seq
+    assert "R-09" in seq
+
+
+def test_the_header_does_not_imply_the_winner_BEAT_anything(capsys):
+    """With four of five sequences undetermined, 'BEST SEQUENCE' would read as
+    though it had won a contest. It was the only candidate, and the report has
+    to say so."""
+    main(BASE)
+    seq = capsys.readouterr().out
+    seq = seq[seq.index("SEQUENCES"):]
+    assert "1 costable" in seq
+    assert "4 undetermined" in seq
+    assert "only one the tool can stand behind" in seq
 
 
 def test_exposure_is_reported_when_a_component_is_tagged(capsys):
