@@ -29,6 +29,18 @@ pytestmark = pytest.mark.dwsim_live
 P_PA = 101325.0
 STAGE_COUNTS = (20, 30, 45)
 
+# MEASURED, not chosen. The 09-09 probe found this column converging in seconds
+# with the feed low in the tower and timing out with it mid-tower; a first run
+# of this file at feed_stage = n // 2 confirmed it, sitting on DWSIM's solver
+# for 5.4 minutes before the transport gave up. At 0.7 it converges in 19 s.
+FEED_STAGE_FRACTION = 0.7
+
+# The feed is taken AS IT ARRIVES rather than having a thermal condition
+# imposed on it. Imposing q was the second half of that non-convergence, and
+# the comparison does not need it: our own V_min is computed from the q this
+# same feed actually has, so both sides describe the same stream.
+IMPOSE_FEED_Q = None
+
 
 def benzene_toluene():
     return Feed(components=(Component("Benzene", resolve("Benzene"), 60.0),
@@ -76,11 +88,12 @@ def test_a_rigorous_column_never_converges_BELOW_the_computed_minimum():
     spec = ColumnSpec(light_key="Benzene", heavy_key="Toluene",
                       lk_recovery_to_distillate=0.99,
                       hk_recovery_to_bottoms=0.99,
-                      pressure_Pa=P_PA, feed_q=q)
+                      pressure_Pa=P_PA, feed_q=IMPOSE_FEED_Q)
 
     measured = {}
     for n in STAGE_COUNTS:
-        run = sim.design_from_stages(feed, spec, n, feed_stage=n // 2)
+        run = sim.design_from_stages(
+            feed, spec, n, feed_stage=int(n * FEED_STAGE_FRACTION))
         if not run.converged:
             pytest.skip(f"DWSIM did not converge at {n} stages: {run.errors}")
         measured[n] = rigorous_vapour_kmol_hr(run)
@@ -111,11 +124,12 @@ def test_more_stages_needs_LESS_vapour():
     spec = ColumnSpec(light_key="Benzene", heavy_key="Toluene",
                       lk_recovery_to_distillate=0.99,
                       hk_recovery_to_bottoms=0.99,
-                      pressure_Pa=P_PA, feed_q=q)
+                      pressure_Pa=P_PA, feed_q=IMPOSE_FEED_Q)
 
     vapours = []
     for n in STAGE_COUNTS:
-        run = sim.design_from_stages(feed, spec, n, feed_stage=n // 2)
+        run = sim.design_from_stages(
+            feed, spec, n, feed_stage=int(n * FEED_STAGE_FRACTION))
         if not run.converged:
             pytest.skip(f"DWSIM did not converge at {n} stages: {run.errors}")
         vapours.append(rigorous_vapour_kmol_hr(run))
