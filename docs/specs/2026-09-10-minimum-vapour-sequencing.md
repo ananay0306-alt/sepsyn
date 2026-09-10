@@ -92,10 +92,15 @@ it contains. That is optimal substructure, so the problem decomposes:
 
 | n | sequences (Catalan) | columns if enumerated | sub-groups | (group, split) pairs |
 |---|---|---|---|---|
-| 4 | 5 | 15 | 10 | 20 |
-| 6 | 42 | 210 | 21 | 56 |
-| 8 | 429 | 3 003 | 36 | 120 |
+| 4 | 5 | 15 | 10 | 10 |
+| 6 | 42 | 210 | 21 | 35 |
+| 8 | 429 | 3 003 | 36 | 84 |
 | **10** | **4 862** | **43 758** | **55** | **165** |
+| 12 | 58 786 | 646 646 | 78 | 286 |
+
+The last column is `sum over k of (n-k+1)(k-1)`: there are `n-k+1` contiguous
+groups of size `k`, each with `k-1` places to cut. Computed, not estimated —
+three entries of this table were wrong when written by hand.
 
 At ten components this is **165 Underwood solves instead of 43 758 column
 designs**, and it returns the provable optimum rather than a ranked list.
