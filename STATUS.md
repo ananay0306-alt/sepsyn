@@ -1,16 +1,17 @@
 # sepsyn — status
 
-Updated 2026-09-08. Check this file; it is the tracker.
+Updated 2026-09-10. Check this file; it is the tracker.
 `cat STATUS.md` beats scrolling a chat log.
 
 ## Where we are
 
 | | |
 |---|---|
-| Milestones done | **1 of 6**, plus the heuristics fold-in and **M3 COMPLETE** |
-| Tests | **251 passing**, 19 s |
-| Blocking right now | nothing. M2 unblocked 09-09, spec revised, not yet planned |
-| Waiting on you | nothing. All M2 decisions ruled 09-09 |
+| Milestones done | **M1, M3, and M6 COMPLETE** plus the heuristics fold-in |
+| Tests | **451 passing** + 2 live DWSIM, ~75 s |
+| Blocking right now | nothing |
+| Waiting on you | nothing |
+| Newest | **M6 minimum-vapour sequencing, verified against rigorous DWSIM** |
 | Published | **public** at github.com/ananay0306-alt/sepsyn, MIT |
 
 ## Environment: FIXED 2026-08-30
@@ -27,6 +28,59 @@ Connected. Suite is back to ~11 s.
 
 Risk 5 was re-tested there and **stands**; see the 08-27 revised spec. The
 eviction changed the failure mode, not the outcome.
+
+## M6: minimum-vapour sequencing — DONE 2026-09-10
+
+The answer to the review's question: *"ten components, how do we separate them
+efficiently, without cost data?"*
+
+**Metric: minimum vapour flow** (Underwood), not cost. A thermodynamic
+requirement, not an estimate. Needs no cost data. Sits UPSTREAM of every layer
+the 09-09 and 09-10 measurements found wanting -- no Gilliland, no tray
+efficiency, no condenser type, no diameter, no cost correlation.
+
+**Algorithm: dynamic programming**, not enumeration. At ten components that is
+165 (group, split) evaluations returning the PROVABLE optimum, against 4,862
+sequences and 43,758 column designs. O(n^3), not Catalan. Proved against
+brute-force enumeration at n = 3, 4, 5 and 6.
+
+**Two stages.** Select with DP on the bound; then verify that ONE sequence with
+the existing screening, real product propagation and `undetermined` blocking.
+Selection is a bound problem, verification a design problem, and conflating
+them is what produced a ranking of columns that could not be built.
+
+Run it:
+
+    python -m sepsyn.cli --feed "Propane:10,Butane:20,Pentane:60,Hexane:10" \
+        --T 330 --vmin --order "Propane,Butane,Pentane,Hexane"
+
+### What M6 measured
+
+- **The bound is real.** Rigorous DWSIM at 20/30/45 stages gives 222.23,
+  145.98, 128.93 kmol/hr against our 124.88: decreasing, approaching from
+  above, never crossing, within 3.2 % at 45 stages.
+  `docs/findings/2026-09-10-vmin-is-a-real-bound.md`
+- **The 09-09 falling-Rmin finding was mis-framed.** The fall is the FEED
+  THERMAL CONDITION, not a defect in `ShortcutColumn`. Our own implementation
+  falls the same way; held at q = 1.0 it rises. Nothing to be filed against
+  BioSTEAM. `docs/findings/2026-09-10-the-falling-rmin-is-the-feed-condition.md`
+- **The heuristics ranking REVERSES** when scored against thermodynamics
+  instead of sepsyn's own cost model: `most_plentiful_first` and `equimolar`
+  find the exact optimum; `easiest_first` and `hardest_last` are 1.6 % above.
+  Phase B had reported the opposite. All four land within 1.6 %, which is
+  itself the answer to "which rule wins when two conflict" on this feed.
+
+### Open after M6
+
+- **The 2x disagreement with BioSTEAM is localised, not resolved.** Ours 1.036
+  against their 0.534 on the four-component alkane feed. It appears only with
+  heavy non-keys; on the binary the two agree. That is the next question.
+- **No azeotrope gate before selection.** R-03 and R-12 catch it in stage 2,
+  after selection has already produced a number. Underwood does not apply to an
+  azeotropic mixture and the result would be confident nonsense.
+- M2 Task 6 (`crossvalidate.py`) never built; Task 3 constants left UNSET.
+- Hafi's condenser/reboiler point, never transcribed.
+- Water/glycerol UNIFAC false positive, documented and unfixed.
 
 ## Decisions waiting on you
 
