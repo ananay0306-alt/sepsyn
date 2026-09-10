@@ -41,8 +41,21 @@ class OptimalSequence:
 
 def best_sequence(order: tuple[str, ...], alpha: dict[str, float],
                   flows: dict[str, float], q: float,
-                  alpha_basis: str = "") -> OptimalSequence:
-    """The minimum-total-vapour sequence for separating `order` completely."""
+                  alpha_basis: str = "",
+                  downstream_q: float = 1.0) -> OptimalSequence:
+    """The minimum-total-vapour sequence for separating `order` completely.
+
+    `q` is the FRESH feed's thermal condition and applies to the first column
+    only. Every other column is fed a product of the column above it -- a
+    bottoms liquid, or a condensed overhead -- each leaving at its own bubble
+    point, so `downstream_q` defaults to saturated liquid.
+
+    That distinction is not cosmetic. q enters Underwood's equation as the
+    right-hand side, and measured on the alkane feed, charging the whole tree
+    the fresh feed's q = 1.40 instead of 1.0 changes WHICH SEQUENCE WINS. A
+    train is not plumbed to feed every column at the cold-storage temperature.
+    """
+    root_group = tuple(order)
     counter = {"n": 0}
 
     @lru_cache(maxsize=None)
@@ -56,11 +69,13 @@ def best_sequence(order: tuple[str, ...], alpha: dict[str, float],
             return 0.0, Node(group=group), ()
         options = []
         refusals = []
+        group_q = q if group == root_group else downstream_q
         for k in range(1, len(group)):
             counter["n"] += 1
             sub = {c: flows[c] for c in group}
             try:
-                split = minimum_vapour(group, alpha, sub, q, k, alpha_basis)
+                split = minimum_vapour(group, alpha, sub, group_q, k,
+                                       alpha_basis)
                 light_total, light_node, light_splits = best(group[:k])
                 heavy_total, heavy_node, heavy_splits = best(group[k:])
             except (NoUnderwoodRoot, NoFeasibleSequence) as exc:
@@ -81,5 +96,5 @@ def best_sequence(order: tuple[str, ...], alpha: dict[str, float],
             )
         return min(options, key=lambda o: o[0])
 
-    total, root, splits = best(tuple(order))
+    total, root, splits = best(root_group)
     return OptimalSequence(root, total, splits, counter["n"])

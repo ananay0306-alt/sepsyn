@@ -53,7 +53,8 @@ def select_and_verify(sim, feed, order: tuple[str, ...],
                       P_Pa: float | None = None,
                       *, lk_recovery: float = 0.99,
                       hk_recovery: float = 0.99,
-                      tags: dict | None = None):
+                      tags: dict | None = None,
+                      downstream_q: float = 1.0):
     """Stage 1 then stage 2. Returns (OptimalSequence, SequenceOutcome)."""
     from sepsyn.cli import resolve_column_pressure
     from sepsyn.feed_condition import feed_condition
@@ -75,8 +76,14 @@ def select_and_verify(sim, feed, order: tuple[str, ...],
         q, q_basis = fc.q, f"q = {fc.q:.4f} ({fc.classification})"
 
     flows = {c.name: c.flow_kmol_hr for c in feed.components}
+    # q is the FRESH feed's condition and is charged to the first column only.
+    # Downstream columns are fed a bottoms liquid or a condensed overhead, each
+    # leaving at its own bubble point. Measured on the alkane feed, getting
+    # this wrong changed the winning sequence.
     selection = best_sequence(tuple(order), alpha, flows, q,
-                              f"{basis}; {q_basis}")
+                              f"{basis}; {q_basis}; downstream columns at "
+                              f"q = {downstream_q}",
+                              downstream_q=downstream_q)
     outcome = evaluate_sequence(sim, feed, selection.root,
                                 lk_recovery=lk_recovery,
                                 hk_recovery=hk_recovery, tags=tags)

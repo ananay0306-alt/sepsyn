@@ -1,7 +1,13 @@
 # BioSTEAM's minimum reflux falls as heavy non-key content rises
 
 **Date:** 2026-09-09
-**Status:** measured, reproducible, and it bears directly on M3
+**Status:** PARTLY CORRECTED 2026-09-10. The fall is real but it is the FEED
+THERMAL CONDITION, not a defect in `ShortcutColumn`. sepsyn's own Underwood
+implementation reproduces the same falling series, and holding q at 1.0 makes
+it rise. Read
+`2026-09-10-the-falling-rmin-is-the-feed-condition.md` before relying on
+anything below. The 9.3x rigorous gap in this document is NOT explained by that
+correction and remains open.
 **Relates to:** M2 spec §2; the 08-27 "Rmin, 24 % (binary) — unexplained" entry
 
 ## The measurement
@@ -20,6 +26,13 @@ Rmin falls by 73 % as the feed grows sevenfold with material that is heavier
 than the heavy key and must all leave in the bottoms.
 
 **Adding heavy non-keys makes the shortcut believe the separation is easier.**
+
+> **Correction, 2026-09-10.** This sentence attributes to the method something
+> that belongs to the feed. Every feed above sits at a fixed 330 K while added
+> pentane raises the bubble point, so each feed is more subcooled than the
+> last (q 1.098 -> 1.558) and genuinely does need less reboil. Our own
+> implementation falls the same way; held at q = 1.0 it rises. Nothing is to be
+> filed against BioSTEAM on this basis.
 
 ## Why that is wrong
 
@@ -88,7 +101,10 @@ needs nine times it.
 
 1. Re-rank the M3 adversarial feed using rigorous refluxes for every column and
    see whether the winner changes. That is the test that matters.
-2. Check whether BioSTEAM's Underwood root selection handles heavy non-keys, or
-   whether `ShortcutColumn` is a documented approximation here.
+2. ~~Check whether BioSTEAM's Underwood root selection handles heavy non-keys.~~
+   DONE 2026-09-10, and the premise was wrong: the trend is the feed condition.
+   What remains is that the two implementations disagree by roughly 2x in
+   ABSOLUTE terms (ours 1.036, BioSTEAM 0.534 on the four-component feed), which
+   a recovery sweep to 99.999 % does not close. That is the open question now.
 3. Consider whether sepsyn should report a reflux at all for columns carrying
    substantial non-key material, or declare it undetermined.

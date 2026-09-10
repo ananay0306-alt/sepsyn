@@ -93,11 +93,52 @@ def test_selection_evaluates_ten_split_pairs_on_a_four_component_feed():
     assert selection.evaluated == 10
 
 
-def test_the_feed_thermal_condition_reaches_the_selection():
-    """Measured: this feed at 330 K is subcooled at 13.694 bar, q = 1.40. q
-    enters Underwood's equation directly, so a selection that defaulted it to
-    1.0 would be solving a different problem."""
-    selection, _ = select_and_verify(
-        BioSteamSimulator(), alkane_feed(), ORDER)
-    # theta for the first split at q = 1.4019, measured
-    assert selection.splits[0].theta == pytest.approx(8.9657, rel=1e-3)
+def test_the_feed_thermal_condition_reaches_the_ROOT_split():
+    """Measured: this feed at 330 K is subcooled at 13.694 bar, q = 1.40. q is
+    the right-hand side of Underwood's equation, so a selection that silently
+    defaulted it to 1.0 would be solving a different problem.
+
+    Asserted against the root split recomputed by hand rather than against a
+    fixed number, so the test survives the winner changing.
+    """
+    from sepsyn.feed_condition import feed_condition
+    from sepsyn.vmin.vapour import minimum_vapour
+
+    feed = alkane_feed()
+    selection, _ = select_and_verify(BioSteamSimulator(), feed, ORDER)
+    alpha, _ = volatilities_for(feed, ALKANE_P)
+    flows = {c.name: c.flow_kmol_hr for c in feed.components}
+    q = feed_condition(feed, ALKANE_P).q
+    assert q == pytest.approx(1.402, rel=1e-2)
+
+    root = selection.splits[0]
+    at_real_q = minimum_vapour(ORDER, alpha, flows, q, k=selection.root.k)
+    at_saturated = minimum_vapour(ORDER, alpha, flows, 1.0, k=selection.root.k)
+    # 1e-6, not exact: q reaches here through an enthalpy-balance solve, and
+    # the two calls converge to slightly different last digits. Still three
+    # orders tighter than the effect being tested -- q = 1.0 against q = 1.40
+    # moves this theta by more than 140%.
+    assert root.theta == pytest.approx(at_real_q.theta, rel=1e-6)
+    assert root.theta != pytest.approx(at_saturated.theta, rel=1e-6)
+
+
+def test_downstream_columns_are_charged_SATURATED_feed_not_the_fresh_q():
+    """A downstream column is fed a bottoms liquid or a condensed overhead,
+    each leaving at its own bubble point. Charging it the fresh feed's
+    subcooling would assume the whole train runs at cold-storage temperature.
+
+    Measured: making this correction changed the winning sequence on this feed
+    and cut its undetermined columns from two to one.
+    """
+    from sepsyn.vmin.vapour import minimum_vapour
+
+    feed = alkane_feed()
+    selection, _ = select_and_verify(BioSteamSimulator(), feed, ORDER)
+    alpha, _ = volatilities_for(feed, ALKANE_P)
+    flows = {c.name: c.flow_kmol_hr for c in feed.components}
+
+    downstream = selection.splits[1]
+    group = downstream.light + downstream.heavy
+    expected = minimum_vapour(group, alpha, {c: flows[c] for c in group},
+                              1.0, k=len(downstream.light))
+    assert downstream.theta == pytest.approx(expected.theta, rel=1e-6)

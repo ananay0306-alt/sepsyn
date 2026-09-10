@@ -118,3 +118,34 @@ def test_the_refusal_names_the_PAIR_that_cannot_be_split():
         best_sequence(("A", "B", "C", "D"), alpha,
                       {c: 25.0 for c in "ABCD"}, q=1.0)
     assert "C" in str(exc.value) and "D" in str(exc.value)
+
+
+def test_only_the_FIRST_column_sees_the_fresh_feed_thermal_condition():
+    """Downstream columns are fed a product of the column above them: a bottoms
+    liquid, or a condensed overhead, each leaving at its own bubble point. They
+    are saturated, not subcooled, whatever the fresh feed was.
+
+    Applying the fresh feed's q to the whole tree would be assuming every
+    column in the train is fed at the cold-storage temperature, which is not
+    how a train is plumbed. It is not a small effect: measured on the alkane
+    feed, q = 1.40 against q = 1.0 changes which sequence wins.
+    """
+    subcooled = best_sequence(ORDER5, ALPHA5, FLOWS5, q=1.6)
+    saturated = best_sequence(ORDER5, ALPHA5, FLOWS5, q=1.0)
+
+    # The root split alone is charged the subcooled feed, so the two runs
+    # differ there and nowhere else.
+    assert subcooled.splits[0].theta != saturated.splits[0].theta
+    downstream_subcooled = sorted(s.theta for s in subcooled.splits[1:])
+    downstream_saturated = sorted(s.theta for s in saturated.splits[1:])
+    assert subcooled.root.k == saturated.root.k, "same tree expected here"
+    assert downstream_subcooled == pytest.approx(downstream_saturated)
+
+
+def test_the_downstream_condition_can_be_overridden():
+    """A train with reboiled side-draws or an intercooler does not feed every
+    downstream column at saturation. The assumption is a default, not a law, so
+    it is a parameter."""
+    a = best_sequence(ORDER5, ALPHA5, FLOWS5, q=1.0, downstream_q=1.0)
+    b = best_sequence(ORDER5, ALPHA5, FLOWS5, q=1.0, downstream_q=0.5)
+    assert a.total_V_min_kmol_hr != b.total_V_min_kmol_hr
