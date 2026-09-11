@@ -84,8 +84,20 @@ def format_report(
     lines.append("")
 
     lines.append(f"VERDICT  distillation {overall.upper()}")
-    for v in fired:
-        lines.append(f"         {v.because}")
+    # The rule that CARRIED the verdict speaks first, and every reason names
+    # its rule. In rule-id order, ethanol/water put R-01 ("distillation is
+    # viable") directly under a verdict of INFEASIBLE, so the first sentence a
+    # reader met argued the opposite of the headline. Both rules did fire and
+    # both belong in the report; only one of them decided the outcome, and the
+    # reader should not have to know the verdict ranking to work out which.
+    decisive = [v for v in fired if v.verdict == overall]
+    others = [v for v in fired if v.verdict != overall]
+    for v in decisive:
+        lines.append(f"         {v.rule_id}  {v.because}")
+    for v in others:
+        lines.append(f"         {v.rule_id}  {v.because}")
+        lines.append(f"               (also fired, but {v.verdict} is not what "
+                     f"decided this verdict)")
     techs = sorted({t for v in fired for t in v.technologies})
     if techs:
         lines.append(f"CANDIDATES  {', '.join(techs)}")
