@@ -25,6 +25,24 @@ def format_vmin(selection, outcome, proxy_scores=(), order=()) -> str:
     lines: list[str] = []
     n = len(order) or len(selection.root.group)
 
+    if outcome.eliminated_by:
+        # Minimum vapour is computed from relative volatilities at the bubble
+        # point, where an azeotrope is invisible: ethanol/water reads alpha 1.9
+        # while the split is thermodynamically impossible. The dynamic program
+        # returns a confident number for a separation that cannot happen, and
+        # the reader must meet the refusal BEFORE the number, not after it.
+        lines.append("THIS SEPARATION CANNOT BE PERFORMED AS SPECIFIED")
+        lines.append(f"  {outcome.eliminated_by}")
+        lines.append("")
+        lines.append("  The minimum vapour below is arithmetic, not a "
+                     "recommendation. Underwood")
+        lines.append("  is evaluated at the bubble point, where an azeotrope "
+                     "does not show; the")
+        lines.append("  screening rules are what see it. Read the number as "
+                     "what the split")
+        lines.append("  WOULD cost if it were possible.")
+        lines.append("")
+
     lines.append("MINIMUM VAPOUR")
     lines.append("  The least vapour that must be boiled to make these "
                  "splits, at")
@@ -75,7 +93,16 @@ def format_vmin(selection, outcome, proxy_scores=(), order=()) -> str:
         lines.append("  Every column screened feasible.")
     lines.append("")
 
-    if proxy_scores:
+    if proxy_scores and outcome.eliminated_by:
+        lines.append("HEURISTICS")
+        lines.append("  Not scored. Ranking a heuristic against an optimum "
+                     "that cannot be built")
+        lines.append("  would be a precision with nothing behind it.")
+        lines.append("")
+        for p in proxy_scores:
+            lines.append(f"    {p.name:<22}{p.sequence_name}")
+        lines.append("")
+    elif proxy_scores:
         lines.append("HEURISTICS")
         lines.append("  Each textbook rule, scored by how much MORE vapour its "
                      "sequence needs")
