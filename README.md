@@ -172,13 +172,13 @@ behaviour this code depends on.
 
 ## Known limits, stated rather than hidden
 
-- **A false positive in the liquid-liquid check.** UNIFAC predicts a
+- **The liquid-liquid check can raise a false alarm.** UNIFAC predicts a
   miscibility gap for water and glycerol, which are miscible in all
-  proportions. Across an eight-pair panel, seven were classified correctly and
-  this one is indistinguishable from a true split by gap width, point count, or
-  composition difference alike. The error is in the activity model, not the
-  search, so the rule flags the pair and points at literature data. It carries
-  verdict `caution` rather than `undetermined` for that reason.
+  proportions, and the false gap looks exactly like a real one by width, point
+  count and composition difference. Switching models does not help. That pair
+  is now overridden by measured data, keyed by CAS number, and the report says
+  so. Other aqueous polyols could fail the same way, which is why the rule
+  carries verdict `caution` rather than `undetermined`.
 - **BioSTEAM clamps column diameter at 0.914 m.** The adapter recovers the true
   hydraulic diameter from BioSTEAM's own correlations, both column sections,
   and carries the clamped value separately since the cost belongs to that one.

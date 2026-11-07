@@ -65,6 +65,13 @@ def format_report(
             "pair at these conditions (this is a gap in the evidence, not a "
             "finding about the mixture)"
         )
+    for m in getattr(record, "measured_miscible", ()):
+        # The model was not asked about this pair. Saying so keeps the
+        # override visible to a reader who would otherwise assume it was.
+        lines.extend(_wrapped(
+            "  MEASURED  ",
+            f"{m.components[0]}/{m.components[1]} not checked for a liquid "
+            f"split: {m.source}"))
     lines.append("")
 
     fired = [v for v in verdicts if v.fired]
