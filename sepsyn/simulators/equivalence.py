@@ -41,7 +41,7 @@ def check_equivalence(spec, sepsyn_result, sepsyn_theoretical_stages,
         ok = dwsim.stages == sepsyn_theoretical_stages
         out.append(Assertion(
             "stage count", ok,
-            f"sepsyn theoretical {sepsyn_theoretical_stages}, DWSIM "
+            f"sepsyn {sepsyn_theoretical_stages} in DWSIM numbering, DWSIM "
             f"{dwsim.stages}" + ("" if ok else
             ". BioSTEAM also reports an ACTUAL count, which is larger and must "
             "never be handed to a rigorous column")))

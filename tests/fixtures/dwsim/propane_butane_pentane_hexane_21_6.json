@@ -1,0 +1,44 @@
+{
+  "P_Pa": 1369410.0,
+  "T_K": 330.0,
+  "bottoms_T_K": 403.64361,
+  "bottoms_mol_s": {
+    "N-butane": 5.500006792726,
+    "N-hexane": 2.7777708670270003,
+    "N-pentane": 16.665201869583,
+    "Propane": 0.027767470663999996
+  },
+  "condenser_duty_kW": 235.004008,
+  "condenser_spec": {
+    "compound": "Propane",
+    "type": "Component Recovery",
+    "unit": "%",
+    "value": 99.0
+  },
+  "converged": true,
+  "distillate_T_K": 313.799425,
+  "distillate_mol_s": {
+    "N-butane": 0.055556757552,
+    "N-hexane": 0.0,
+    "N-pentane": 0.001476498306,
+    "Propane": 2.7500005511729997
+  },
+  "errors": [],
+  "feed_mol_s": {
+    "N-butane": 5.555555555555555,
+    "N-hexane": 2.7777777777777777,
+    "N-pentane": 16.666666666666668,
+    "Propane": 2.7777777777777777
+  },
+  "feed_stage": 6,
+  "property_package": "Peng-Robinson (PR)",
+  "reboiler_duty_kW": 589.822306,
+  "reboiler_spec": {
+    "compound": "N-butane",
+    "type": "Component Recovery",
+    "unit": "%",
+    "value": 99.0
+  },
+  "solver": "Napthali-Sandholm (Simultaneous Correction)",
+  "stages": 21
+}

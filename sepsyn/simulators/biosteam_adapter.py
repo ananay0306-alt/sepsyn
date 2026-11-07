@@ -99,6 +99,15 @@ def _hydraulic_diameter_m(col) -> float:
 _EMPTY_FLASH = FlashResult({}, {}, 0.0, 0.0, False)
 
 
+def _int_or_none(value):
+    """BioSTEAM writes '?' and '100+' into these fields when its staircase
+    fails, so a non-number is absent, not zero."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class BioSteamSimulator:
     """Passes recoveries straight through to BioSTEAM.
 
@@ -216,6 +225,10 @@ class BioSteamSimulator:
                         or None),
                     column_diameter_m=_true_diameter_m(col, d),
                     feed_q=feed_q,
+                    theoretical_stages=_int_or_none(
+                        d.get("Theoretical stages")),
+                    theoretical_feed_stage=_int_or_none(
+                        d.get("Theoretical feed stage")),
                     distillate_H_kW=float(D.H) / 3600.0,
                     bottoms_H_kW=float(B.H) / 3600.0,
                 )
@@ -284,6 +297,10 @@ class BioSteamSimulator:
                         float(d.get("Diameter", 0.0)) / BIOSTEAM_FT_PER_M or None),
                     column_diameter_m=_true_diameter_m(col, d),
                     feed_q=feed_q,
+                    theoretical_stages=_int_or_none(
+                        d.get("Theoretical stages")),
+                    theoretical_feed_stage=_int_or_none(
+                        d.get("Theoretical feed stage")),
                 )
         except Exception as exc:
             return dataclasses.replace(
