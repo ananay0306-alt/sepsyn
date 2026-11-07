@@ -70,6 +70,18 @@ Design the column:
 Add `--explain` to print the rules that did **not** fire, with the values they
 tested. Flows are kmol/hr, temperatures K, pressures Pa.
 
+## Use it from Claude (MCP)
+
+```bash
+claude mcp add sepsyn -- /path/to/sepsyn/.venv/bin/python -m sepsyn.mcp_server
+```
+
+Run that from the repository root so the module is importable. Five tools:
+`screen_mixture`, `design_column`, `sequence_by_minimum_vapour`,
+`rank_sequences` and `find_azeotropes`. Each one builds the same arguments the
+CLI takes and returns the same report, so the server cannot drift from the
+tool it wraps. `skill/SKILL.md` covers the shell route instead.
+
 ## Saving a run
 
 ```bash
