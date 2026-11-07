@@ -12,6 +12,7 @@ a ranking of columns that could not be built, because the selection step was
 carrying assumptions it had no way to check. Minimum vapour cannot see
 condenser feasibility either -- which is exactly why stage 2 still runs.
 """
+from sepsyn.vmin.gate import AzeotropeBlocksSelection, azeotrope_gate
 from sepsyn.vmin.sequence import OptimalSequence, best_sequence
 
 
@@ -63,6 +64,12 @@ def select_and_verify(sim, feed, order: tuple[str, ...],
     pressure = P_Pa
     if pressure is None:
         pressure, _ = resolve_column_pressure(feed, order[0], None)
+
+    # Before any arithmetic: an azeotrope is invisible to Underwood, so the
+    # dynamic program would otherwise select a train that cannot exist.
+    azeotropes = azeotrope_gate(feed, pressure)
+    if azeotropes:
+        raise AzeotropeBlocksSelection(azeotropes, pressure)
 
     alpha, basis = volatilities_for(feed, pressure)
 

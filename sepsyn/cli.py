@@ -309,10 +309,17 @@ def main(argv: list[str] | None = None) -> int:
         from sepsyn.vmin.report import format_vmin
         from sepsyn.vmin.sequence import NoFeasibleSequence
 
+        from sepsyn.vmin.gate import AzeotropeBlocksSelection, format_refusal
+
         column_P, _ = resolve_column_pressure(feed, order[0], args.column_P)
         try:
             selection, outcome = select_and_verify(
                 BioSteamSimulator(), feed, order, column_P)
+        except AzeotropeBlocksSelection as exc:
+            emit()
+            emit(format_refusal(exc))
+            save()
+            return 1
         except (NoFeasibleSequence, ValueError) as exc:
             emit(f"\nNo sequence could be selected: {exc}")
             save()
