@@ -61,3 +61,34 @@ three feed placements tried.
 2. Or the cheaper route 09-11 proposed: a three-component feed with only a
    trace of heavy non-key, swept upward, where the rigorous solve converges as
    readily as the binary did.
+
+## 2026-11-08: the reflux-spec attempt, and the decision
+
+A sharper test than pushing recovery specs to more stages: fix the reflux
+ratio between the two candidate minima (ours R ~ 1.04, BioSTEAM's ~ 0.53),
+give the column far more stages than it needs, and read whether 99/99 is
+reachable. The specs most likely to converge were tried first.
+
+| stages | feed | specs | solver | result |
+|---|---|---|---|---|
+| 60 | 20 | R = 1.2, butane recovery 99 % | Napthali-Sandholm | timeout, 300 s |
+| 40 | 13 | R = 1.2, bottoms 24.972 mol/s (flowsheet reused after the failed 60) | Napthali-Sandholm | timeout, 240 s |
+| 40 | 13 | R = 1.2, bottoms 24.972 mol/s, fresh flowsheet | Wang-Henke | max iterations (200) |
+
+None converged, so the 30-stage ceiling is not about the specification
+basis: DWSIM through dwsim-mcp does not solve this column above 30 stages
+with any configuration tried.
+
+**Decision (Ananay, 11-08): stop here and carry it as a known limit.** The
+question needs an initial profile carried from a converged column into a
+larger one, which the fresh-flowsheet transport deliberately cannot do, or a
+different rigorous tool. Neither is worth building for a preliminary-design
+tool whose limitation is already measured and stated:
+
+- the shortcut under-predicts multicomponent duties with heavy non-keys (M2:
+  -70 % condenser, -25 % reboiler on this feed);
+- which V_min is right, ours or BioSTEAM's, is unresolved; both are
+  consistent with every rigorous point that converged.
+
+The cheaper route in "What would", item 2 (a trace heavy non-key), remains
+open if the question becomes important later.

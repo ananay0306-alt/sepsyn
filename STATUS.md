@@ -23,7 +23,7 @@ Updated 2026-11-08. Owner: Ananay Khandelwal (sole). Check this file; it is the 
 | M2 Task 3, stage conventions | PINNED. From the source and a duty-minimum sweep: BioSTEAM counts the feed from the TOP, includes the reboiler, excludes a total condenser. DWSIM = N + 1 stages, same feed index. 09-09 bottom-numbering hypothesis refuted | `simulators/conventions.py`, `docs/findings/2026-11-07-stage-conventions.md` |
 | M2 Task 6, the comparison | DONE. Gap reported only when every assertion holds. Binary: about 4 % on duties. Alkanes: shortcut UNDER-predicts condenser duty by 70 %, reboiler by 25 %. Both runs recorded as fixtures | `sepsyn/crossvalidate.py` |
 | M5, LLM interface | DONE as an MCP server: five tools wrapping the CLI, tested over real stdio | `sepsyn/mcp_server.py` |
-| BioSTEAM 2x Rmin question | STILL OPEN, but the 09-11 blocker is explained: the feed was at the wrong end. Rigorous V now 59.6 at 21 stages, 39.6 at 30; no convergence above 30 | `docs/findings/2026-11-07-the-alkane-bound-test.md` |
+| BioSTEAM 2x Rmin question | CLOSED AS A KNOWN LIMIT 11-08. Rigorous V 59.6 at 21 stages, 39.6 at 30; three more configurations above 30 (reflux specs, flow specs, Wang-Henke) also failed to converge. Unresolved which V_min is right; both are consistent with every converged point | `docs/findings/2026-11-07-the-alkane-bound-test.md` |
 | M4 | DRAFT scope only. Needs your content and four decisions | `docs/specs/2026-11-07-m4-heuristic-database-DRAFT.md` |
 | Hafi's condenser/reboiler point | DROPPED 11-08. Hafi has left the project and the point was never transcribed. The measured condenser/reboiler gap is tracked under the alkane bound test | |
 
