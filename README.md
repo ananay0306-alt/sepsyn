@@ -70,6 +70,18 @@ Design the column:
 Add `--explain` to print the rules that did **not** fire, with the values they
 tested. Flows are kmol/hr, temperatures K, pressures Pa.
 
+## Use it from Claude (MCP)
+
+```bash
+claude mcp add sepsyn -- /path/to/sepsyn/.venv/bin/python -m sepsyn.mcp_server
+```
+
+Run that from the repository root so the module is importable. Five tools:
+`screen_mixture`, `design_column`, `sequence_by_minimum_vapour`,
+`rank_sequences` and `find_azeotropes`. Each one builds the same arguments the
+CLI takes and returns the same report, so the server cannot drift from the
+tool it wraps. `skill/SKILL.md` covers the shell route instead.
+
 ## Saving a run
 
 ```bash
@@ -172,13 +184,13 @@ behaviour this code depends on.
 
 ## Known limits, stated rather than hidden
 
-- **A false positive in the liquid-liquid check.** UNIFAC predicts a
+- **The liquid-liquid check can raise a false alarm.** UNIFAC predicts a
   miscibility gap for water and glycerol, which are miscible in all
-  proportions. Across an eight-pair panel, seven were classified correctly and
-  this one is indistinguishable from a true split by gap width, point count, or
-  composition difference alike. The error is in the activity model, not the
-  search, so the rule flags the pair and points at literature data. It carries
-  verdict `caution` rather than `undetermined` for that reason.
+  proportions, and the false gap looks exactly like a real one by width, point
+  count and composition difference. Switching models does not help. That pair
+  is now overridden by measured data, keyed by CAS number, and the report says
+  so. Other aqueous polyols could fail the same way, which is why the rule
+  carries verdict `caution` rather than `undetermined`.
 - **BioSTEAM clamps column diameter at 0.914 m.** The adapter recovers the true
   hydraulic diameter from BioSTEAM's own correlations, both column sections,
   and carries the clamped value separately since the cost belongs to that one.

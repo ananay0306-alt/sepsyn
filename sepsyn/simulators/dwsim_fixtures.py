@@ -41,6 +41,11 @@ class DwsimRun:
     reboiler_duty_kW: float | None = None
     distillate_T_K: float | None = None
     bottoms_T_K: float | None = None
+    stages_read_back: int | None = None
+    """Read from DWSIM's own column after configuring, not copied from the
+    request. `stages` and `feed_stage` are what was SENT; only these show what
+    DWSIM actually built. None in a recording made before 11-08."""
+    feed_stage_read_back: int | None = None
 
 
 def save_fixture(path: str, run: DwsimRun) -> None:

@@ -1,18 +1,31 @@
 # sepsyn — status
 
-Updated 2026-09-10. Check this file; it is the tracker.
+Updated 2026-11-07. Check this file; it is the tracker.
 `cat STATUS.md` beats scrolling a chat log.
 
 ## Where we are
 
 | | |
 |---|---|
-| Milestones done | **M1, M3, and M6 COMPLETE** plus the heuristics fold-in |
-| Tests | **451 passing** + 2 live DWSIM, ~75 s |
+| Milestones done | **M1, M2, M3, M5 and M6 COMPLETE** plus the heuristics fold-in. M4 scoped as a draft |
+| Tests | **499 passing** + 4 live DWSIM, ~80 s |
 | Blocking right now | nothing |
-| Waiting on you | nothing |
-| Newest | **M6 minimum-vapour sequencing, verified against rigorous DWSIM** |
+| Waiting on you | merge `overnight-v1`; M4 decisions; Hafi's point |
+| Newest | **11-07 overnight: azeotrope gate, glycerol fix, M2 conventions + gap, MCP server** |
 | Published | **public** at github.com/ananay0306-alt/sepsyn, MIT |
+
+## Overnight 2026-11-07, branch `overnight-v1` (not merged)
+
+| item | result | where |
+|---|---|---|
+| Azeotrope gate before selection | DONE. Any azeotropic pair in the feed refuses `--vmin` before Underwood runs; no number is printed. Ethanol/water/butanol now names both azeotropes and the alternatives | `sepsyn/vmin/gate.py` |
+| Water/glycerol false positive | FIXED by data. Switching models does not help (the default is already Dortmund; original UNIFAC finds no split at all). Measured-miscible pairs, keyed by CAS, are not scanned, and the report states the override | `sepsyn/lle.py` |
+| M2 Task 3, stage conventions | PINNED. From the source and a duty-minimum sweep: BioSTEAM counts the feed from the TOP, includes the reboiler, excludes a total condenser. DWSIM = N + 1 stages, same feed index. 09-09 bottom-numbering hypothesis refuted | `simulators/conventions.py`, `docs/findings/2026-11-07-stage-conventions.md` |
+| M2 Task 6, the comparison | DONE. Gap reported only when every assertion holds. Binary: about 4 % on duties. Alkanes: shortcut UNDER-predicts condenser duty by 70 %, reboiler by 25 %. Both runs recorded as fixtures | `sepsyn/crossvalidate.py` |
+| M5, LLM interface | DONE as an MCP server: five tools wrapping the CLI, tested over real stdio | `sepsyn/mcp_server.py` |
+| BioSTEAM 2x Rmin question | STILL OPEN, but the 09-11 blocker is explained: the feed was at the wrong end. Rigorous V now 59.6 at 21 stages, 39.6 at 30; no convergence above 30 | `docs/findings/2026-11-07-the-alkane-bound-test.md` |
+| M4 | DRAFT scope only. Needs your content and four decisions | `docs/specs/2026-11-07-m4-heuristic-database-DRAFT.md` |
+| Hafi's condenser/reboiler point | not attempted; only Hafi knows it | |
 
 ## Environment: FIXED 2026-08-30
 
@@ -75,12 +88,10 @@ Run it:
 - **The 2x disagreement with BioSTEAM is localised, not resolved.** Ours 1.036
   against their 0.534 on the four-component alkane feed. It appears only with
   heavy non-keys; on the binary the two agree. That is the next question.
-- **No azeotrope gate before selection.** R-03 and R-12 catch it in stage 2,
-  after selection has already produced a number. Underwood does not apply to an
-  azeotropic mixture and the result would be confident nonsense.
-- M2 Task 6 (`crossvalidate.py`) never built; Task 3 constants left UNSET.
+- ~~No azeotrope gate before selection.~~ DONE 11-07.
+- ~~M2 Task 6 never built; Task 3 constants UNSET.~~ DONE 11-07.
 - Hafi's condenser/reboiler point, never transcribed.
-- Water/glycerol UNIFAC false positive, documented and unfixed.
+- ~~Water/glycerol UNIFAC false positive.~~ FIXED 11-07 by measured data.
 
 ## Decisions waiting on you
 
@@ -122,7 +133,7 @@ instead of only a verdict.
       refute it has run
 - Done now because it makes M4 a default-valued field instead of a migration
 
-### [ ] M2 — rigorous cross-validation · UNBLOCKED, NOT PLANNED
+### [x] M2 — rigorous cross-validation · COMPLETE 11-07 (see the overnight table)
 How far is sepsyn's shortcut design from a rigorous answer? DWSIM's rigorous
 column is the REFERENCE, not a peer, so the gap measures shortcut error.
 
@@ -336,7 +347,7 @@ calculation, never as answers.
 - [ ] Content being drafted separately
 - [ ] Needs its own spec
 
-### [ ] M5 — LLM interface · NOT STARTED, NO SPEC
+### [x] M5 — LLM interface · COMPLETE 11-07 as an MCP server
 Wrap the library as an agent or MCP server. The core deliberately has no LLM in
 it, so this is a wrapper, not a rewrite.
 

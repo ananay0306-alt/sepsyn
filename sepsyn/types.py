@@ -107,6 +107,10 @@ class PropertyRecord:
     steam_T: float = 433.15
     """Available heating utility temperature. Default mirrors
     properties.STEAM_T (low pressure steam, 160 C)."""
+    measured_miscible: tuple = ()
+    """Pairs the liquid-liquid search skipped because measured data say they
+    are fully miscible (lle.MEASURED_MISCIBLE). Carried so the report can state
+    the override; not rule-visible."""
 
     def as_namespace(self) -> dict[str, object]:
         """Flat scalars for rule evaluation. Structured fields are withheld."""

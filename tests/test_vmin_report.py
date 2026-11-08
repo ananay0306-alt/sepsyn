@@ -98,29 +98,28 @@ AZEOTROPE = ["--feed", "Ethanol:40,Water:40,Butanol:20", "--T", "298",
              "--vmin", "--order", "Ethanol,Water,Butanol"]
 
 
-def test_an_eliminated_sequence_is_announced_BEFORE_its_vapour_number(capsys):
+def test_an_azeotropic_train_is_refused_with_NO_vapour_number(capsys):
     """Minimum vapour is computed from relative volatilities at the bubble
     point, and an azeotrope does not show up there -- ethanol/water reads
     alpha 1.9 while the split is thermodynamically impossible. The dynamic
-    program therefore returns a perfectly confident 415.3 kmol/hr for a
-    separation that cannot be performed.
+    program used to return a confident 415.3 kmol/hr for this train.
 
-    Stage 2 catches it, but the reader meets the number first and the refusal
-    eight lines later. A skimming reader takes away the number. The headline
-    must carry the verdict.
+    The 09-11 fix moved the refusal above the number. The azeotrope gate
+    (tests/test_vmin_azeotrope_gate.py) now refuses before selection, so the
+    number is never computed at all.
     """
-    _, out = run(capsys, AZEOTROPE)
-    head = out[:out.index("OPTIMAL SEQUENCE")]
-    assert "CANNOT BE PERFORMED" in head.upper() or "IMPOSSIBLE" in head.upper()
-    assert "R-03" in head
+    code, out = run(capsys, AZEOTROPE)
+    assert code == 1
+    assert "CANNOT BE PERFORMED" in out.upper()
+    assert "OPTIMAL SEQUENCE" not in out
 
 
 def test_the_heuristics_are_NOT_scored_against_an_impossible_optimum(capsys):
     """Reporting that a heuristic is 13.5% worse than an optimum which cannot
-    be built is a precision that means nothing. Say the comparison is void
-    rather than print a number for it."""
+    be built is a precision that means nothing."""
     _, out = run(capsys, AZEOTROPE)
-    assert "%" not in out[out.index("HEURISTICS"):]
+    assert "HEURISTICS" not in out
+    assert "% vapour" not in out
 
 
 def test_a_feasible_run_is_UNAFFECTED(capsys):

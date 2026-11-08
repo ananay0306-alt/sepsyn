@@ -8,6 +8,9 @@ chemicals==1.5.2
 numpy==2.5.2
 PyYAML==6.0.3
 
+# Only for the MCP server (python -m sepsyn.mcp_server).
+mcp==2.0.0
+
 # The test suite is not optional here. Several tests encode a measured finding
 # rather than an expected value, and they are the record of why the code looks
 # the way it does.

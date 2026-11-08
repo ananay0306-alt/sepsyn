@@ -67,17 +67,21 @@ def test_the_check_follows_the_KEYS_when_they_are_known():
     assert keyed.has_two_liquid_phases is False
 
 
-def test_without_keys_the_screen_is_BROADER_and_flags_the_non_key_pair():
-    """Pinned deliberately, including the false positive it contains.
+def test_without_keys_the_screen_is_BROADER_and_scans_every_pair():
+    """Before keys are named the tool does not know which separation is being
+    asked about, so it screens every pair.
 
-    Before keys are named the tool does not know which separation is being
-    asked about, so it screens every pair -- and on this feed that surfaces the
-    water/glycerol false positive. Recorded here so the behaviour is a known
-    property of the tool rather than a surprise in someone's report.
+    This used to be pinned WITH the water/glycerol false positive: the broad
+    screen of this feed reported a split. Measured miscibility now overrides
+    that pair (tests/test_measured_miscibility.py), so the broad screen reads
+    clean and a real split elsewhere in the feed is still what it would find.
     """
     ternary = feed_of(("Methanol", 100.0), ("Water", 80.0), ("Glycerol", 25.0),
                       T_K=330.0)
-    assert build_property_record(ternary).has_two_liquid_phases is True
+    assert build_property_record(ternary).has_two_liquid_phases is False
+    with_benzene = feed_of(("Methanol", 100.0), ("Water", 80.0),
+                           ("Benzene", 25.0), T_K=330.0)
+    assert build_property_record(with_benzene).has_two_liquid_phases is True
 
 
 def test_not_checked_is_not_the_same_as_checked_and_found_none():

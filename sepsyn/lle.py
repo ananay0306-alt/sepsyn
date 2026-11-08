@@ -74,6 +74,40 @@ MIN_PHASE_FRACTION = 1e-3
 # An undetermined verdict blocks design, and blocking design on a false alarm
 # at this rate is worse calibrated than flagging it and letting the reader
 # dismiss it -- which they can, because the rule names the pair.
+#
+# FIXED 11-07 by data rather than by model. Swapping the model does not help:
+# the default here is already Dortmund UNIFAC, and original UNIFAC, measured on
+# a fourteen-pair panel, found no split at all -- not even water/benzene. So a
+# pair whose miscibility is MEASURED is not scanned, and the override travels
+# with the record so the report states it. Keyed by CAS, so a synonym cannot
+# dodge it. Add a pair only with a citable measurement of full miscibility.
+MEASURED_MISCIBLE: dict[frozenset[str], str] = {
+    frozenset({"7732-18-5", "56-81-5"}): (
+        "water and glycerol are miscible in all proportions (CRC Handbook of "
+        "Chemistry and Physics; Perry's Chemical Engineers' Handbook)"
+    ),
+}
+
+
+@dataclass(frozen=True)
+class MeasuredMiscible:
+    """A pair the model was NOT asked about, because data already answer it."""
+    components: tuple[str, str]
+    source: str
+
+
+def measured_miscible_pairs(names: Sequence[str]) -> list[MeasuredMiscible]:
+    from sepsyn.properties import resolve
+
+    out = []
+    for a, b in itertools.combinations(names, 2):
+        try:
+            key = frozenset({resolve(a), resolve(b)})
+        except Exception:
+            continue
+        if key in MEASURED_MISCIBLE:
+            out.append(MeasuredMiscible((a, b), MEASURED_MISCIBLE[key]))
+    return out
 
 
 @dataclass(frozen=True)
@@ -141,7 +175,10 @@ def find_liquid_split(names: Sequence[str],
     import numpy as np
     import thermosteam as tmo
 
+    skip = {frozenset(p.components) for p in measured_miscible_pairs(names)}
     for a, b in itertools.combinations(names, 2):
+        if frozenset((a, b)) in skip:
+            continue
         with contextlib.redirect_stdout(io.StringIO()):
             try:
                 chems = tmo.Chemicals([a, b])

@@ -1,0 +1,40 @@
+{
+  "P_Pa": 101325.0,
+  "T_K": 298.15,
+  "bottoms_T_K": 383.126148,
+  "bottoms_mol_s": {
+    "Benzene": 0.16666250497500001,
+    "Toluene": 11.000004495025001
+  },
+  "condenser_duty_kW": 1127.619545,
+  "condenser_spec": {
+    "compound": "Benzene",
+    "type": "Component Recovery",
+    "unit": "%",
+    "value": 99.0
+  },
+  "converged": true,
+  "distillate_T_K": 352.946356,
+  "distillate_mol_s": {
+    "Benzene": 16.499999278521003,
+    "Toluene": 0.111111721479
+  },
+  "errors": [],
+  "feed_mol_s": {
+    "Benzene": 16.666666666666668,
+    "Toluene": 11.11111111111111
+  },
+  "feed_stage": 13,
+  "feed_stage_read_back": 13,
+  "property_package": "Peng-Robinson (PR)",
+  "reboiler_duty_kW": 1397.142463,
+  "reboiler_spec": {
+    "compound": "Toluene",
+    "type": "Component Recovery",
+    "unit": "%",
+    "value": 99.0
+  },
+  "solver": "Napthali-Sandholm (Simultaneous Correction)",
+  "stages": 25,
+  "stages_read_back": 25
+}

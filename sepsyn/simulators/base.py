@@ -95,6 +95,15 @@ class ColumnResult:
     This is the TRUE hydraulic diameter, recovered from under BioSTEAM's
     0.914 m floor -- see _hydraulic_diameter_m in the adapter. Above the floor
     it equals biosteam_reported_diameter_m exactly."""
+    theoretical_stages: int | None = None
+    """BioSTEAM's 'Theoretical stages': equilibrium stages INCLUDING the
+    reboiler and EXCLUDING a total condenser (the McCabe-Thiele staircase
+    starts at the reboiler; Gilliland counts the same way). `stages` above is
+    the ACTUAL count, and only this one may be handed to a rigorous column."""
+    theoretical_feed_stage: int | None = None
+    """BioSTEAM's 'Theoretical feed stage', counted from the TOP: BioSTEAM
+    reports N minus the stripping stages (Kirkbride, or the staircase).
+    See simulators/conventions.py for the mapping onto DWSIM's numbering."""
     feed_q: float | None = None
     """The feed thermal condition this design ACTUALLY ran at, measured at the
     column pressure. Heuristic step 17.

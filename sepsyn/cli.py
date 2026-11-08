@@ -276,13 +276,15 @@ def main(argv: list[str] | None = None) -> int:
     emit(format_report(feed, record, verdicts, overall, explain=args.explain))
     designed = None
 
-    def save() -> None:
+    def save(selection: dict | None = None) -> None:
         if args.out:
             with open(args.out, "w") as fh:
                 fh.write("\n".join(printed).rstrip() + "\n")
         if args.json_path or args.html_path:
             from sepsyn.serialize import run_to_dict, write_json
             payload = run_to_dict(feed, record, verdicts, overall, designed)
+            if selection is not None:
+                payload["selection"] = selection
             if args.json_path:
                 write_json(args.json_path, payload)
             if args.html_path:
@@ -309,10 +311,21 @@ def main(argv: list[str] | None = None) -> int:
         from sepsyn.vmin.report import format_vmin
         from sepsyn.vmin.sequence import NoFeasibleSequence
 
+        from sepsyn.vmin.gate import AzeotropeBlocksSelection, format_refusal
+
         column_P, _ = resolve_column_pressure(feed, order[0], args.column_P)
         try:
             selection, outcome = select_and_verify(
                 BioSteamSimulator(), feed, order, column_P)
+        except AzeotropeBlocksSelection as exc:
+            emit()
+            emit(format_refusal(exc))
+            # The JSON must say the selection was refused; without this it
+            # reads as a plain screening run.
+            save({"refused": "azeotrope", "P_Pa": exc.P_Pa, "azeotropes": [
+                {"components": list(a.components), "x": list(a.x),
+                 "T_K": a.T_K, "P_Pa": a.P_Pa} for a in exc.azeotropes]})
+            return 1
         except (NoFeasibleSequence, ValueError) as exc:
             emit(f"\nNo sequence could be selected: {exc}")
             save()

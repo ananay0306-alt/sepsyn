@@ -105,7 +105,7 @@ import warnings
 
 from sepsyn.types import Alpha, PropertyRecord
 from sepsyn.azeotropes import find_azeotropes
-from sepsyn.lle import find_liquid_split
+from sepsyn.lle import find_liquid_split, measured_miscible_pairs
 
 warnings.filterwarnings("ignore")
 
@@ -203,6 +203,7 @@ def build_property_record(
         # Same discipline as the azeotrope search: with no liquid phase there
         # is nothing to split, so the search never ran. None, not False.
         splits: bool | None = None
+        overrides: tuple = ()
         phase = "vapor"
     else:
         alphas = relative_volatilities(feed, P)
@@ -222,6 +223,7 @@ def build_property_record(
         pair = ([light_key, heavy_key] if light_key and heavy_key
                 else list(feed.names))
         splits = find_liquid_split(pair, P) is not None
+        overrides = tuple(measured_miscible_pairs(pair))
         # The SAME pair the liquid-liquid check uses, and for the same reason.
         # An azeotrope is a property of the separation being attempted, not of
         # the mixture standing in the column. A column splitting acetone from
@@ -279,4 +281,5 @@ def build_property_record(
         column_P_Pa=P,
         column_P_basis=column_P_basis,
         steam_T=STEAM_T,
+        measured_miscible=overrides,
     )

@@ -181,6 +181,10 @@ def run_to_dict(feed, record, verdicts, overall, designed=None) -> dict:
             "n_supercritical_at_feed": record.n_supercritical_at_feed,
             "has_azeotrope": record.has_azeotrope,
             "has_two_liquid_phases": record.has_two_liquid_phases,
+            "measured_miscible": [
+                {"components": list(m.components), "source": m.source}
+                for m in record.measured_miscible
+            ],
             "rules": [_verdict(v) for v in verdicts],
         },
         # None, not {}. The run did not design a column, which is a different

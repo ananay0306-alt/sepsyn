@@ -202,8 +202,9 @@
     this rule is questioning; that temperature places the probe near where the
     column would operate but is not itself trustworthy once a split has been
     found. Second, and measured: the underlying activity-coefficient model
-    predicts a false miscibility gap for water and glycerol, which are in fact
-    miscible in all proportions, and that false positive is indistinguishable
-    from a true one by gap width or composition difference. Aqueous polyols are
-    a known weak point. Check the named pair against literature solubility data
-    before acting on this, and treat it as caution rather than a finding
+    can predict a false miscibility gap. It does for water and glycerol, which
+    are miscible in all proportions; that pair is now overridden by measured
+    data, but the false positive was indistinguishable from a true one by gap
+    width or composition difference, so other aqueous polyols may behave the
+    same. Check the named pair against literature solubility data before acting
+    on this, and treat it as caution rather than a finding
