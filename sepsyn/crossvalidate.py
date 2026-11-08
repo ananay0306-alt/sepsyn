@@ -17,11 +17,21 @@ or under-predicts a duty is design information that an absolute value throws
 away. Temperatures are compared in kelvin, because a percentage of an absolute
 temperature is a number that looks small whatever it is.
 """
+import math
 from dataclasses import dataclass
 
 from sepsyn.simulators.conventions import dwsim_feed_stage, dwsim_stage_count
 from sepsyn.simulators.equivalence import (
     UNATTRIBUTED, Assertion, can_report_gap, check_equivalence)
+
+# The identity feed-stage mapping was established on a binary. On the
+# multicomponent (Kirkbride) column it was not: the 11-07 sweep put DWSIM's
+# best feed one stage lower, so part of any multicomponent gap is placement.
+MULTICOMPONENT_FEED_STAGE = (
+    "feed stage placement: the mapping was measured on a binary column. On "
+    "the 4-component alkane column DWSIM's best feed was index 7, not the "
+    "mapped 6, worth 1.7 % of reboiler duty (11-07 sweep)"
+)
 
 NOT_COMPARED = (
     "reflux ratio: the DWSIM transport does not read it back",
@@ -87,27 +97,47 @@ def compare(feed, spec, biosteam_sim, dwsim_sim) -> Comparison:
         return _refused(feed_condition,
                         Assertion("stage count", None, str(exc)))
 
+    unattributed = UNATTRIBUTED + (
+        (MULTICOMPONENT_FEED_STAGE,) if len(feed.components) > 2 else ())
     run = dwsim_sim.design_from_stages(feed, spec, stages, feed_stage)
     assertions = (feed_condition,) + check_equivalence(
         spec, design, stages, feed_stage, run)
+    duties = (
+        ("condenser duty", design.condenser_duty_kW, run.condenser_duty_kW),
+        ("reboiler duty", design.reboiler_duty_kW, run.reboiler_duty_kW))
+    temperatures = (
+        ("distillate temperature", design.distillate_T_K, run.distillate_T_K),
+        ("bottoms temperature", design.bottoms_T_K, run.bottoms_T_K))
+    assertions += (_values_usable(duties, temperatures),)
     if not can_report_gap(assertions):
-        return Comparison(assertions, (), False, UNATTRIBUTED,
+        return Comparison(assertions, (), False, unattributed,
                           stages, feed_stage)
 
-    gaps = []
-    for name, ours, theirs in (
-            ("condenser duty", design.condenser_duty_kW, run.condenser_duty_kW),
-            ("reboiler duty", design.reboiler_duty_kW, run.reboiler_duty_kW)):
-        if ours is not None and theirs:
-            gaps.append(Gap(name, ours, abs(theirs), "kW",
-                            (ours - abs(theirs)) / abs(theirs)))
-    for name, ours, theirs in (
-            ("distillate temperature", design.distillate_T_K, run.distillate_T_K),
-            ("bottoms temperature", design.bottoms_T_K, run.bottoms_T_K)):
-        if ours is not None and theirs is not None:
-            gaps.append(Gap(name, ours, theirs, "K", None))
-    return Comparison(assertions, tuple(gaps), True, UNATTRIBUTED,
+    gaps = [Gap(name, ours, abs(theirs), "kW",
+                (ours - abs(theirs)) / abs(theirs))
+            for name, ours, theirs in duties]
+    gaps += [Gap(name, ours, theirs, "K", None)
+             for name, ours, theirs in temperatures]
+    return Comparison(assertions, tuple(gaps), True, unattributed,
                       stages, feed_stage)
+
+
+def _values_usable(duties, temperatures) -> Assertion:
+    """Every compared number must exist and be finite, and a converged
+    column's duty cannot be zero. Dropping a bad one quietly would leave a
+    reportable comparison the reader takes as agreement on that quantity."""
+    bad = []
+    for name, ours, theirs in duties + temperatures:
+        for side, v in (("sepsyn", ours), ("DWSIM", theirs)):
+            if v is None or not math.isfinite(v):
+                bad.append(f"{side} {name} is {v}")
+            elif "duty" in name and v == 0:
+                bad.append(f"{side} {name} is 0 kW, which a working column "
+                           f"cannot have")
+    return Assertion("compared values", not bad,
+                     "; ".join(bad) if bad else
+                     "both duties and both end temperatures present on "
+                     "both sides")
 
 
 def format_comparison(c: Comparison) -> str:

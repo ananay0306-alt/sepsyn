@@ -85,3 +85,15 @@ def test_the_cli_names_what_would_work_instead(capsys):
     main(CLI)
     out = capsys.readouterr().out.lower()
     assert "pressure-swing" in out or "extractive" in out
+
+
+def test_the_json_records_the_refusal(tmp_path):
+    """Review 11-08: a refused selection used to write a JSON that read as a
+    plain screening run."""
+    import json
+    path = tmp_path / "run.json"
+    assert main(CLI + ["--json", str(path)]) == 1
+    sel = json.loads(path.read_text())["selection"]
+    assert sel["refused"] == "azeotrope"
+    assert any(set(a["components"]) == {"Ethanol", "Water"}
+               for a in sel["azeotropes"])

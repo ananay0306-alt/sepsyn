@@ -37,6 +37,42 @@ def test_a_bad_name_is_refused_before_the_cli_sees_it():
         srv.screen_mixture({"Benzene,Toluene": 60})
 
 
+def test_a_misspelt_name_comes_back_WITH_the_suggestion():
+    """Review 11-08: the suggestion went to stderr, which was not captured, so
+    the model saw only 'invalid arguments' and could not correct the name."""
+    with pytest.raises(ToolError, match="Did you mean"):
+        srv.screen_mixture({"Benzzzene": 60, "Toluene": 40})
+
+
+def test_tools_run_one_at_a_time():
+    """BioSTEAM's thermo settings and sys.stdout are process-wide. Two tools
+    overlapping would each be able to run on the other's chemicals."""
+    import threading
+    from unittest import mock
+
+    inside, peak, lock = [0], [0], threading.Lock()
+
+    def fake_main(argv):
+        with lock:
+            inside[0] += 1
+            peak[0] = max(peak[0], inside[0])
+        threading.Event().wait(0.05)
+        with lock:
+            inside[0] -= 1
+        print("VERDICT FEASIBLE")
+        return 0
+
+    with mock.patch.object(srv, "main", fake_main):
+        ts = [threading.Thread(target=srv.screen_mixture,
+                               args=({"Benzene": 60, "Toluene": 40},))
+              for _ in range(4)]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
+    assert peak[0] == 1
+
+
 def test_a_cli_usage_error_becomes_a_tool_error():
     with pytest.raises(ToolError):
         srv.sequence_by_minimum_vapour({"Benzene": 60, "Toluene": 40},

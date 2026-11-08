@@ -22,6 +22,9 @@ nothing reused between runs:
                           Napthali-Sandholm, max_iterations
     connect_column_stream F feed at the mapped stage, D distillate, B bottoms,
                           QC condenser_duty, QR reboiler_duty
+    run_script            read back the stage count and feed stage from the
+                          column itself, so equivalence checks what DWSIM
+                          built rather than what was asked for
     solve                 with a timeout
     get_results
 """
@@ -49,6 +52,35 @@ DWSIM_NAMES = {
 }
 PASS_THROUGH = {"Propane", "Benzene", "Toluene", "Ethanol", "Water",
                 "Methanol", "Acetone", "Glycerol"}
+
+
+# Reads the column's configuration back out of DWSIM. A feed records its stage
+# by name ("Stage13"); its position in the column's own stage list is the
+# index, with 0 the condenser. -1 means the feed is not on any stage.
+READ_BACK = (
+    'var col = (DWSIM.UnitOperations.UnitOperations.DistillationColumn)'
+    'sim.GetFlowsheetSimulationObject("T1"); '
+    'var f = sim.GetFlowsheetSimulationObject("F"); '
+    'var st = col.Stages.ToList(); '
+    'var fs = col.MaterialStreams.Values.Where(s => s.StreamID == f.Name '
+    '&& s.StreamBehavior.ToString() == "Feed").Select(s => st.FindIndex('
+    'x => x.Name == s.AssociatedStage || x.ID == s.AssociatedStage)).ToList(); '
+    'return "{\\"stages\\":" + st.Count + ",\\"feed_stages\\":[" '
+    '+ string.Join(",", fs) + "]}";'
+)
+
+
+def parse_read_back(text: str) -> tuple[int | None, int | None]:
+    """run_script's reply into (stages, feed stage). Anything but exactly one
+    feed on a real stage gives None, which the equivalence check reports as
+    unknown rather than passing."""
+    try:
+        data = json.loads(json.loads(text)["result"])
+    except (ValueError, KeyError, TypeError):
+        return None, None
+    feeds = data.get("feed_stages") or []
+    feed = feeds[0] if len(feeds) == 1 and feeds[0] >= 0 else None
+    return data.get("stages"), feed
 
 
 class DwsimResultError(ValueError):
@@ -190,13 +222,16 @@ async def _build_and_solve(session, feed, spec, stages, feed_stage, timeout_s):
                       ("QC", "condenser_duty"), ("QR", "reboiler_duty")):
         await call("connect_column_stream", {"column_tag": "T1",
                                              "stream_tag": tag, "role": role})
+    stages_back, feed_back = parse_read_back(
+        await call("run_script", {"code": READ_BACK}))
 
     solved = json.loads(await call("solve", {"timeout_seconds": timeout_s}))
     common = dict(
         feed_mol_s=mol_s, T_K=feed.T_K, P_Pa=spec.pressure_Pa, stages=stages,
         feed_stage=feed_stage, condenser_spec=condenser,
         reboiler_spec=reboiler, property_package=PROPERTY_PACKAGE,
-        solver=SOLVER)
+        solver=SOLVER, stages_read_back=stages_back,
+        feed_stage_read_back=feed_back)
 
     if not solved.get("converged"):
         # A solve that does not finish is a FACT about the case, not an

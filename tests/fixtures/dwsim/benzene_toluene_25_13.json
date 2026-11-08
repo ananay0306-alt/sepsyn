@@ -25,6 +25,7 @@
     "Toluene": 11.11111111111111
   },
   "feed_stage": 13,
+  "feed_stage_read_back": 13,
   "property_package": "Peng-Robinson (PR)",
   "reboiler_duty_kW": 1397.142463,
   "reboiler_spec": {
@@ -34,5 +35,6 @@
     "value": 99.0
   },
   "solver": "Napthali-Sandholm (Simultaneous Correction)",
-  "stages": 25
+  "stages": 25,
+  "stages_read_back": 25
 }

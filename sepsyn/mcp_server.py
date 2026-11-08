@@ -8,9 +8,15 @@ The core has no LLM in it, deliberately, and this module does not change that.
 Run it with `python -m sepsyn.mcp_server` (stdio). stdout belongs to the
 protocol, so the CLI's report is captured rather than printed, and BioSTEAM's
 own chatter goes with it.
+
+One tool runs at a time. The server calls sync tools from worker threads, but
+sys.stdout and BioSTEAM's thermo settings belong to the whole process: two
+columns solved at once could each run on the other's chemicals and return
+wrong numbers without an error.
 """
 import contextlib
 import io
+import threading
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -27,6 +33,7 @@ INSTRUCTIONS = (
 )
 
 server = MCPServer("sepsyn", instructions=INSTRUCTIONS)
+_one_at_a_time = threading.Lock()
 
 
 def _feed_arg(feed: dict[str, float]) -> str:
@@ -41,14 +48,20 @@ def _feed_arg(feed: dict[str, float]) -> str:
 
 
 def _run(argv: list[str]) -> str:
-    out = io.StringIO()
-    with contextlib.redirect_stdout(out):
-        code = main(argv)
-    text = out.getvalue().strip()
+    out, err = io.StringIO(), io.StringIO()
+    with _one_at_a_time, contextlib.redirect_stdout(out), \
+            contextlib.redirect_stderr(err):
+        try:
+            code = main(argv)
+        except SystemExit as exc:  # argparse rejecting the arguments
+            code = exc.code
     if code == 2:
-        # The CLI's usage errors: the request itself was wrong.
-        raise ToolError(text or "invalid arguments")
-    return text
+        # The CLI's usage errors: the request itself was wrong. Its message,
+        # including resolve()'s "did you mean", goes to stderr, and the model
+        # needs it to correct the request.
+        raise ToolError(err.getvalue().strip() or out.getvalue().strip()
+                        or "invalid arguments")
+    return out.getvalue().strip()
 
 
 def _common(feed, T_K, P_Pa, column_P_Pa) -> list[str]:
@@ -148,7 +161,8 @@ def find_azeotropes(components: list[str], P_Pa: float = 101325.0) -> str:
 
     if len(components) < 2:
         raise ToolError("an azeotrope needs at least two components")
-    found = search(components, P_Pa)
+    with _one_at_a_time, contextlib.redirect_stdout(io.StringIO()):
+        found = search(components, P_Pa)
     if not found:
         return (f"No azeotrope found among {', '.join(components)} at "
                 f"{P_Pa / 1e5:.3f} bar (201-point scan per pair).")

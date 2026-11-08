@@ -33,16 +33,23 @@ def check_equivalence(spec, sepsyn_result, sepsyn_theoretical_stages,
     out: list[Assertion] = []
 
     # Stage basis. BioSTEAM's Actual stages must never reach DWSIM; handing 28
-    # where 20 was meant produced DCErrorStillHigh in the probe.
+    # where 20 was meant produced DCErrorStillHigh in the probe. Checked
+    # against what DWSIM READ BACK from its column: comparing against the
+    # request we sent would compare the number with itself and always hold.
     if sepsyn_theoretical_stages is None:
         out.append(Assertion("stage count", None,
                              "sepsyn's theoretical stage count was not supplied"))
+    elif dwsim.stages_read_back is None:
+        out.append(Assertion(
+            "stage count", None,
+            f"DWSIM's stage count was not read back from the column; "
+            f"{dwsim.stages} is what was sent, which proves nothing"))
     else:
-        ok = dwsim.stages == sepsyn_theoretical_stages
+        ok = dwsim.stages_read_back == sepsyn_theoretical_stages
         out.append(Assertion(
             "stage count", ok,
             f"sepsyn {sepsyn_theoretical_stages} in DWSIM numbering, DWSIM "
-            f"{dwsim.stages}" + ("" if ok else
+            f"column has {dwsim.stages_read_back}" + ("" if ok else
             ". BioSTEAM also reports an ACTUAL count, which is larger and must "
             "never be handed to a rigorous column")))
 
@@ -51,11 +58,17 @@ def check_equivalence(spec, sepsyn_result, sepsyn_theoretical_stages,
             "feed stage", None,
             "sepsyn's feed stage was not supplied, or the numbering convention "
             "between the two tools is not yet established"))
+    elif dwsim.feed_stage_read_back is None:
+        out.append(Assertion(
+            "feed stage", None,
+            f"DWSIM's feed stage was not read back from the column; "
+            f"{dwsim.feed_stage} is what was sent, which proves nothing"))
     else:
-        ok = dwsim.feed_stage == sepsyn_feed_stage
+        ok = dwsim.feed_stage_read_back == sepsyn_feed_stage
         out.append(Assertion(
             "feed stage", ok,
-            f"sepsyn {sepsyn_feed_stage}, DWSIM {dwsim.feed_stage}"))
+            f"sepsyn {sepsyn_feed_stage}, DWSIM feed connected at index "
+            f"{dwsim.feed_stage_read_back}"))
 
     ok = abs(dwsim.P_Pa - spec.pressure_Pa) / spec.pressure_Pa < 1e-6
     out.append(Assertion("pressure", ok,

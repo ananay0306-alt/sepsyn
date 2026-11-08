@@ -90,3 +90,24 @@ def test_the_adapter_never_mutates_a_flowsheet():
         assert forbidden not in identifiers, (
             f"{forbidden} is CALLED in the adapter; a mutated flowsheet "
             f"produced a silently doubled feed in the 09-09 probe")
+
+
+def test_the_read_back_reply_is_parsed():
+    from sepsyn.simulators.dwsim_adapter import parse_read_back
+    reply = '{"result": "{\\"stages\\":25,\\"feed_stages\\":[13]}"}'
+    assert parse_read_back(reply) == (25, 13)
+
+
+@pytest.mark.parametrize("reply", [
+    '{"result": "{\\"stages\\":25,\\"feed_stages\\":[]}"}',
+    '{"result": "{\\"stages\\":25,\\"feed_stages\\":[-1]}"}',
+    '{"result": "{\\"stages\\":25,\\"feed_stages\\":[6,13]}"}',
+])
+def test_a_feed_on_no_stage_or_two_is_NOT_a_feed_stage(reply):
+    from sepsyn.simulators.dwsim_adapter import parse_read_back
+    assert parse_read_back(reply)[1] is None
+
+
+def test_a_script_error_reads_back_as_unknown():
+    from sepsyn.simulators.dwsim_adapter import parse_read_back
+    assert parse_read_back("Error: compilation failed") == (None, None)

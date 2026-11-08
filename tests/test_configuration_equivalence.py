@@ -45,6 +45,9 @@ def dwsim_run(**over):
         distillate_T_K=353.6, bottoms_T_K=383.5,
     )
     base.update(over)
+    # A fake column has what it is said to have, unless a test says otherwise.
+    base.setdefault("stages_read_back", base["stages"])
+    base.setdefault("feed_stage_read_back", base["feed_stage"])
     return DwsimRun(**base)
 
 
@@ -73,6 +76,27 @@ def test_a_feed_stage_mismatch_is_caught():
     a = by_name(check_equivalence(SPEC, sepsyn_result(), 20, 6,
                                   dwsim_run(feed_stage=14)))
     assert a["feed stage"].holds is False
+
+
+def test_the_check_reads_what_DWSIM_BUILT_not_what_was_sent():
+    """Review 11-08: comparing against the request compares a number with
+    itself. A column that ignored the request must fail even though the
+    request was right."""
+    a = by_name(check_equivalence(SPEC, sepsyn_result(), 20, 10,
+                                  dwsim_run(stages_read_back=19,
+                                            feed_stage_read_back=11)))
+    assert a["stage count"].holds is False
+    assert a["feed stage"].holds is False
+
+
+def test_a_column_never_read_back_is_UNKNOWN_and_blocks_the_gap():
+    a = check_equivalence(SPEC, sepsyn_result(), 20, 10,
+                          dwsim_run(stages_read_back=None,
+                                    feed_stage_read_back=None))
+    assert by_name(a)["stage count"].holds is None
+    assert by_name(a)["feed stage"].holds is None
+    assert "proves nothing" in by_name(a)["stage count"].detail
+    assert can_report_gap(a) is False
 
 
 def test_a_pressure_mismatch_is_caught():

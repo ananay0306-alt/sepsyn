@@ -33,7 +33,9 @@ class FakeDwsim:
 
     def design_from_stages(self, feed, spec, stages, feed_stage):
         self.asked = (stages, feed_stage)
-        return replace(self.run, stages=stages, feed_stage=feed_stage)
+        return replace(self.run, stages=stages, feed_stage=feed_stage,
+                       stages_read_back=stages,
+                       feed_stage_read_back=feed_stage)
 
 
 @pytest.fixture
@@ -111,6 +113,25 @@ def test_a_missing_theoretical_count_is_refused_before_dwsim_runs(matched):
     assert c.reportable is False and dwsim.asked is None
 
 
+@pytest.mark.parametrize("bad", [0.0, float("nan"), None])
+def test_an_unusable_DWSIM_duty_blocks_the_gap_instead_of_vanishing(bad):
+    """Review 11-08: a 0.0 duty used to drop out of the gaps silently while
+    the comparison stayed reportable, so the reader took it as agreement."""
+    ours = sepsyn_result(theoretical_stages=19, theoretical_feed_stage=10)
+    c = compare(FEED, SPEC, FakeBioSteam(ours),
+                FakeDwsim(dwsim_run(condenser_duty_kW=bad)))
+    assert c.reportable is False and c.gaps == ()
+    assert "condenser duty" in format_comparison(c)
+
+
+def test_a_missing_sepsyn_temperature_blocks_the_gap(matched):
+    feed, spec, _, dwsim = matched
+    ours = sepsyn_result(theoretical_stages=19, theoretical_feed_stage=10,
+                         bottoms_T_K=None)
+    c = compare(feed, spec, FakeBioSteam(ours), dwsim)
+    assert c.reportable is False
+
+
 def test_the_reflux_omission_is_stated(matched):
     assert "not compared: reflux" in format_comparison(compare(*matched))
 
@@ -127,6 +148,7 @@ def test_the_recorded_benzene_toluene_run_replays_and_reports():
     duties = {g.quantity: g.relative for g in c.gaps if g.unit == "kW"}
     assert abs(duties["reboiler duty"]) < 0.10
     assert abs(duties["condenser duty"]) < 0.10
+    assert "feed stage placement" not in format_comparison(c)
 
 
 def test_the_recorded_alkane_run_reports_the_shortcut_UNDER_predicting():
@@ -145,5 +167,6 @@ def test_the_recorded_alkane_run_reports_the_shortcut_UNDER_predicting():
     assert c.reportable, format_comparison(c)
     assert (c.dwsim_stages, c.dwsim_feed_stage) == (21, 6)
     duties = {g.quantity: g.relative for g in c.gaps if g.unit == "kW"}
+    assert "feed stage placement" in format_comparison(c)
     assert -0.80 < duties["condenser duty"] < -0.60
     assert -0.35 < duties["reboiler duty"] < -0.15
