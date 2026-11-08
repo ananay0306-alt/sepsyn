@@ -1,6 +1,6 @@
 # sepsyn — status
 
-Updated 2026-11-07. Check this file; it is the tracker.
+Updated 2026-11-08. Owner: Ananay Khandelwal (sole). Check this file; it is the tracker.
 `cat STATUS.md` beats scrolling a chat log.
 
 ## Where we are
@@ -8,13 +8,13 @@ Updated 2026-11-07. Check this file; it is the tracker.
 | | |
 |---|---|
 | Milestones done | **M1, M2, M3, M5 and M6 COMPLETE** plus the heuristics fold-in. M4 scoped as a draft |
-| Tests | **499 passing** + 4 live DWSIM, ~80 s |
+| Tests | **513 passing** + 4 live DWSIM, ~90 s |
 | Blocking right now | nothing |
-| Waiting on you | merge `overnight-v1`; M4 decisions; Hafi's point |
-| Newest | **11-07 overnight: azeotrope gate, glycerol fix, M2 conventions + gap, MCP server** |
+| Waiting on you | M4 decisions |
+| Newest | **11-08: overnight work reviewed, six findings fixed, merged to `main`** |
 | Published | **public** at github.com/ananay0306-alt/sepsyn, MIT |
 
-## Overnight 2026-11-07, branch `overnight-v1` (not merged)
+## Overnight 2026-11-07, branch `overnight-v1` (MERGED 11-08 after review)
 
 | item | result | where |
 |---|---|---|
@@ -25,7 +25,25 @@ Updated 2026-11-07. Check this file; it is the tracker.
 | M5, LLM interface | DONE as an MCP server: five tools wrapping the CLI, tested over real stdio | `sepsyn/mcp_server.py` |
 | BioSTEAM 2x Rmin question | STILL OPEN, but the 09-11 blocker is explained: the feed was at the wrong end. Rigorous V now 59.6 at 21 stages, 39.6 at 30; no convergence above 30 | `docs/findings/2026-11-07-the-alkane-bound-test.md` |
 | M4 | DRAFT scope only. Needs your content and four decisions | `docs/specs/2026-11-07-m4-heuristic-database-DRAFT.md` |
-| Hafi's condenser/reboiler point | not attempted; only Hafi knows it | |
+| Hafi's condenser/reboiler point | DROPPED 11-08. Hafi has left the project and the point was never transcribed. The measured condenser/reboiler gap is tracked under the alkane bound test | |
+
+## Review of `overnight-v1`, 2026-11-08
+
+A high-effort review found ten issues; six fixed before merging, four
+cleanups left open.
+
+| finding | fix |
+|---|---|
+| Stage count and feed stage were checked against copies of the request, so they always held | Read back from DWSIM's own column; unread is UNKNOWN. Fixtures re-recorded, duties identical |
+| MCP tools could overlap and solve on each other's chemicals | One tool at a time |
+| A misspelt name came back as "invalid arguments" | The CLI's stderr, with "did you mean", is the tool error |
+| A zero or NaN DWSIM duty dropped out of the gap silently | Blocks the gap and names the value |
+| Multicomponent feed-stage mapping unverified | Named as unattributed (7 vs 6 on the alkanes, 1.7 % reboiler) |
+| `--vmin --json` did not record an azeotrope refusal | Written under `"selection"` |
+
+Open cleanups: the azeotrope scan runs twice on `--vmin`; the refusal text
+exists in three copies; measured-miscible pairs computed twice per record;
+"201-point scan" hardcoded in the MCP tool.
 
 ## Environment: FIXED 2026-08-30
 
@@ -90,7 +108,7 @@ Run it:
   heavy non-keys; on the binary the two agree. That is the next question.
 - ~~No azeotrope gate before selection.~~ DONE 11-07.
 - ~~M2 Task 6 never built; Task 3 constants UNSET.~~ DONE 11-07.
-- Hafi's condenser/reboiler point, never transcribed.
+- ~~Hafi's condenser/reboiler point, never transcribed.~~ DROPPED 11-08: Hafi left the project.
 - ~~Water/glycerol UNIFAC false positive.~~ FIXED 11-07 by measured data.
 
 ## Decisions waiting on you
