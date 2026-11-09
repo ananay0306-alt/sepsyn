@@ -1,7 +1,8 @@
 # sepsyn
 
-Screening and preliminary design for binary distillation, built so that **every
-assumption it makes is written down**.
+Screening and preliminary design for distillation, from a single column to the
+order of columns for a ten-component feed, built so that **every assumption it
+makes is written down**.
 
 Two engineers can run the same column, both correctly, and disagree by 58%.
 Not because either made a mistake, but because one quietly assumed something
@@ -22,6 +23,22 @@ VERDICT  distillation FEASIBLE
 
 Not just a verdict. The rule that produced it, the number it tested, and the
 pressure that number was evaluated at.
+
+What it does:
+
+- **Screens** a mixture: whether distillation can work, at what column
+  pressure, and what to use instead when it cannot (azeotropes, two liquid
+  phases, components that will not condense).
+- **Designs** the column: stages, reflux, duties, diameter, cost, and the
+  equipment choices, each marked as evidence or convention.
+- **Sequences** a multicomponent feed: the provably best order of columns by
+  minimum vapour, then every column checked as a real design. Ten components
+  take about 25 seconds.
+- **Scores the textbook heuristics** against that optimum, each with its
+  citation.
+- **Checks itself against DWSIM**, a rigorous simulator, and reports the gap
+  only once both tools are shown to be modelling the same column.
+- Runs from the terminal, or **from Claude** as an MCP server.
 
 ## Why
 
@@ -69,6 +86,62 @@ Design the column:
 
 Add `--explain` to print the rules that did **not** fire, with the values they
 tested. Flows are kmol/hr, temperatures K, pressures Pa.
+
+Choose the order of columns for a multicomponent feed:
+
+```bash
+.venv/bin/python -m sepsyn.cli --feed "Propane:10,Butane:20,Pentane:60,Hexane:10" \
+  --T 330 --vmin --order "Propane,Butane,Pentane,Hexane"
+```
+
+`--order` lists the components lightest to heaviest. `--vmin` finds the
+sequence that needs the least vapour, by dynamic programming over Underwood's
+minimum vapour: at ten components that is 165 splits evaluated instead of 4,862
+sequences, and the answer is the optimum rather than the best of a sample. It
+needs no cost data. Each column of the chosen sequence is then screened and
+designed for real, because minimum vapour cannot see whether an overhead will
+condense. `--sequence` instead designs and costs every sequence and ranks them.
+
+An azeotropic pair anywhere in the feed blocks every sequence, so `--vmin`
+refuses before computing anything and names what would work instead.
+
+## The heuristics, scored
+
+Textbook rules for ordering columns ("recover the most plentiful component
+first", "make the most difficult splits last") are stored in
+`sepsyn/heuristics.yaml`, each with its source, and both sequencing reports
+score them against the optimum:
+
+```
+H-01  Recover the lightest component first          +1.6% vapour
+      Douglas (1985), as listed in Separation_heuristics.pdf
+H-02  Recover the most plentiful component first    the optimum
+H-05  Perform the easiest separation first          +1.6% vapour
+      Harbert (1957) ... (citation unverified)
+```
+
+A heuristic never changes an answer. It points at a calculation, and a test
+holds the report above the heuristics identical with the database emptied. A
+citation known only from a secondary source says so.
+
+## Checked against a rigorous simulator
+
+`sepsyn/crossvalidate.py` builds the same column in DWSIM (through
+[dwsim-mcp](https://github.com/ananay0306-alt/dwsim-mcp)) and reports the gap,
+but only after every configuration assertion holds: the same stage count and
+feed stage read back from DWSIM's own column, the same pressure, the same
+specification, a closed mass balance, and the same feed state on both sides.
+Otherwise it reports no gap and names the assertion that failed. A gap between
+two differently configured columns is bookkeeping, not shortcut error.
+
+| Column | Condenser | Reboiler | End temperatures |
+|---|---|---|---|
+| Benzene/toluene | -3.6 % | +3.9 % | within 0.5 K |
+| Pentane/hexane, saturated feed | -15.5 % | -10.9 % | exact |
+| Four-alkane, heavy non-keys | -69.7 % | -25.4 % | within 1.1 K |
+
+The shortcut under-predicts multicomponent duties, worst with heavy non-keys.
+That is what a preliminary design tool is, and the table is the evidence.
 
 ## Use it from Claude (MCP)
 
@@ -178,7 +251,8 @@ requires:
 .venv/bin/python -m pytest -q
 ```
 
-251 tests, about 19 seconds. They are worth reading: several encode a measured
+544 tests, about 90 seconds; six more run against a live DWSIM with
+`-m dwsim_live`. They are worth reading: several encode a measured
 finding rather than an expected value, including the ones that pin third-party
 behaviour this code depends on.
 
@@ -191,6 +265,15 @@ behaviour this code depends on.
   is now overridden by measured data, keyed by CAS number, and the report says
   so. Other aqueous polyols could fail the same way, which is why the rule
   carries verdict `caution` rather than `undetermined`.
+- **Shortcut duties run low on multicomponent columns**, 11 to 16 % on a
+  column with traces and up to 70 % on the condenser with heavy non-keys,
+  measured against DWSIM (see above).
+- **Which minimum vapour is right on the four-alkane feed is unresolved.**
+  sepsyn's Underwood and BioSTEAM's differ by about 2x. Both are consistent
+  with every rigorous column that converged, and DWSIM does not converge that
+  column above 30 stages, so the question is recorded, not answered.
+- **Steady state, preliminary design.** No dynamics, no tray hydraulics, no
+  reactive distillation.
 - **BioSTEAM clamps column diameter at 0.914 m.** The adapter recovers the true
   hydraulic diameter from BioSTEAM's own correlations, both column sections,
   and carries the clamped value separately since the cost belongs to that one.
