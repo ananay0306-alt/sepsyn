@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A seven-beat live demo of sepsyn. Run it in front of someone.
+# A nine-beat live demo of sepsyn. Run it in front of someone.
 #
 #   ./demo.sh              pause between beats, so you can talk
 #   NOPAUSE=1 ./demo.sh    run straight through
@@ -79,5 +79,17 @@ run $PY -m sepsyn.cli --feed "Water:60,Glycerol:40" --T 350 --design \
 say "It stops, and tells you exactly which number to go and find."
 pause
 
-b "8. All of it is checked" ""
+b "8. Ten components, the best order of columns" \
+  "Ten components need nine columns, and there are 4,862 possible orders."
+say "Working it out (about 25 seconds)..."
+O="Propane,Butane,Pentane,Hexane,Heptane,Octane,Nonane,Decane,Undecane,Dodecane"
+F=$(echo "$O" | tr ',' '\n' | sed 's/$/:10/' | paste -sd, -)
+printf '\033[2m$ %s\033[0m\n' "$PY -m sepsyn.cli --feed $F --T 330 --vmin --order $O"
+"$PY" -m sepsyn.cli --feed "$F" --T 330 --vmin --order "$O" 2>/dev/null \
+    | sed -n '/kmol\/hr total/,/provable optimum/p'
+say "165 splits checked instead of 4,862 sequences, and it is the provable best."
+say "No cost data needed: it minimises the vapour the columns must boil."
+pause
+
+b "9. All of it is checked" ""
 run $PY -m pytest -q -p no:warnings
