@@ -1,4 +1,4 @@
-"""The four classic sequencing heuristics, as proxies.
+"""The classic sequencing heuristics, as proxies.
 
 A proxy is a cheap ESTIMATOR of the objective, not a competitor to it. The spec
 argues that "easiest split first", "hardest last", "most plentiful first" and
@@ -67,6 +67,12 @@ def _build(order: tuple[str, ...], choose) -> Node:
                 heavy=_build(order[k:], choose))
 
 
+def _lightest_first(order, flows, alphas):
+    """The direct sequence: every column takes the lightest component
+    overhead."""
+    return _build(order, lambda group: 1)
+
+
 def _easiest_first(order, flows, alphas):
     """Split where the volatility gap is widest."""
     def choose(group):
@@ -119,7 +125,9 @@ def _equimolar(order, flows, alphas):
     return _build(order, choose)
 
 
+# Statements and citations for these live in heuristics.yaml (M4).
 PROXIES = {
+    "lightest_first": _lightest_first,
     "easiest_first": _easiest_first,
     "hardest_last": _hardest_last,
     "most_plentiful_first": _most_plentiful_first,

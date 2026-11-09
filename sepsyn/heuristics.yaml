@@ -1,0 +1,87 @@
+# Separation heuristics. M4.
+#
+# Guidance that POINTS AT a calculation, never an answer. A heuristic here
+# cannot change a verdict or a selection: the sequence sepsyn reports is the
+# minimum-vapour optimum, and each heuristic is scored against it. This file
+# only says which textbook rules apply, where they come from, and which
+# calculation tests them.
+#
+# Every entry cites its source. `source_verified: false` means the wording has
+# not been read in the original, only in a secondary account, and the report
+# says so beside the citation.
+#
+# `applies_when` uses the same restricted expressions as rules.yaml, over the
+# names in heuristicdb.SEQUENCING_FIELDS only.
+#
+# Research trail: Notion, Research Hub, project "sepsyn M4: heuristic database
+# sources" (2026-11-08).
+
+- id: H-01
+  statement: Recover the lightest component first
+  source: "Douglas (1985), as listed in Separation_heuristics.pdf"
+  source_verified: true
+  scope: sequencing
+  applies_when: "n_components >= 3"
+  proxy: lightest_first
+  tested_by: vmin
+  conflicts_with: [H-02, H-04]
+  measured:
+    - "11-08, propane/butane/pentane/hexane 10/20/60/10: +1.6 % vapour"
+    - "11-08, ten n-alkanes C3 to C12 at 10 kmol/hr each: the optimum"
+
+- id: H-02
+  statement: Recover the most plentiful component first
+  source: "Douglas (1985), as listed in Separation_heuristics.pdf"
+  source_verified: true
+  scope: sequencing
+  applies_when: "n_components >= 3"
+  proxy: most_plentiful_first
+  tested_by: vmin
+  conflicts_with: [H-01, H-04]
+  measured:
+    - "M6, propane/butane/pentane/hexane 10/20/60/10: the optimum (STATUS.md)"
+    - "11-08, ten n-alkanes at equal flows: the optimum"
+
+- id: H-03
+  statement: Make the most difficult splits last
+  source: "Douglas (1985), as listed in Separation_heuristics.pdf"
+  source_verified: true
+  scope: sequencing
+  applies_when: "n_components >= 3"
+  proxy: hardest_last
+  tested_by: vmin
+  conflicts_with: []
+  measured:
+    - "M6, propane/butane/pentane/hexane 10/20/60/10: +1.6 % vapour (STATUS.md)"
+    - "11-08, ten n-alkanes at equal flows: +3.3 % vapour"
+
+- id: H-04
+  statement: Favor equimolar splits
+  source: "Douglas (1985), as listed in Separation_heuristics.pdf"
+  source_verified: true
+  scope: sequencing
+  applies_when: "n_components >= 3"
+  proxy: equimolar
+  tested_by: vmin
+  conflicts_with: [H-01, H-02]
+  measured:
+    - "M6, propane/butane/pentane/hexane 10/20/60/10: the optimum (STATUS.md)"
+    - "11-08, ten n-alkanes at equal flows: +17.5 % vapour"
+
+- id: H-05
+  statement: Perform the easiest separation first
+  # Not in the project's own source list. Harbert's paper is not online; the
+  # wording "First, carry out the simplest separation" is from a secondary
+  # review (Hussain 2023, IJAER 26(1)). Usually taught together with H-03 as
+  # "easy first, difficult last", and on a first cut the two choose the same
+  # split.
+  source: "Harbert (1957), 'Which Tower Goes Where?', Petroleum Refiner 36(3):169-174, as reported by Hussain (2023)"
+  source_verified: false
+  scope: sequencing
+  applies_when: "n_components >= 3"
+  proxy: easiest_first
+  tested_by: vmin
+  conflicts_with: []
+  measured:
+    - "M6, propane/butane/pentane/hexane 10/20/60/10: +1.6 % vapour (STATUS.md)"
+    - "11-08, ten n-alkanes at equal flows: +3.3 % vapour"

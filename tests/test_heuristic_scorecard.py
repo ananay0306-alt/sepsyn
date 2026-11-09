@@ -33,7 +33,8 @@ def card():
 
 def test_every_proxy_is_scored(card):
     assert {s.name for s in card.scores} == {
-        "easiest_first", "hardest_last", "most_plentiful_first", "equimolar"}
+        "lightest_first", "easiest_first", "hardest_last",
+        "most_plentiful_first", "equimolar"}
 
 
 def test_each_score_names_the_sequence_that_proxy_chose(card):

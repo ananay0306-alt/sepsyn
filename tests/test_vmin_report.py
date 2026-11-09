@@ -59,9 +59,8 @@ def test_the_heuristics_are_scored_against_the_MINIMUM(capsys):
     ruler grading itself."""
     _, out = run(capsys)
     assert "HEURISTICS" in out
-    for name in ("easiest_first", "hardest_last",
-                 "most_plentiful_first", "equimolar"):
-        assert name in out
+    for hid in ("H-01", "H-02", "H-03", "H-04", "H-05"):
+        assert hid in out
     assert "%" in out
 
 

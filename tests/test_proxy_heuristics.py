@@ -40,8 +40,10 @@ def test_every_adjacent_pair_has_an_alpha(alphas):
         assert alphas.values[(a, b)] > 1.0
 
 
-def test_there_are_exactly_four_proxies():
-    assert set(PROXIES) == {"easiest_first", "hardest_last",
+def test_there_are_exactly_five_proxies():
+    """Four from the project's source list (Douglas 1985), plus easiest-first.
+    lightest_first added 11-08 for M4."""
+    assert set(PROXIES) == {"lightest_first", "easiest_first", "hardest_last",
                             "most_plentiful_first", "equimolar"}
 
 

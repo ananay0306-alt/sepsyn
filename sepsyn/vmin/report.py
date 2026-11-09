@@ -21,7 +21,20 @@ def catalan(n_components: int) -> int:
     return comb(2 * m, m) // (m + 1)
 
 
-def format_vmin(selection, outcome, proxy_scores=(), order=()) -> str:
+def _heuristic_lines(name, heuristics):
+    """A proxy's label: its database statement and citation when it has one,
+    its code name when it does not."""
+    from sepsyn.heuristicdb import by_proxy, default_heuristics
+
+    h = by_proxy(default_heuristics() if heuristics is None
+                 else heuristics).get(name)
+    if h is None:
+        return name, None
+    return f"{h.id}  {h.statement}", h.citation
+
+
+def format_vmin(selection, outcome, proxy_scores=(), order=(),
+                heuristics=None) -> str:
     lines: list[str] = []
     n = len(order) or len(selection.root.group)
 
@@ -100,7 +113,9 @@ def format_vmin(selection, outcome, proxy_scores=(), order=()) -> str:
         lines.append("  would be a precision with nothing behind it.")
         lines.append("")
         for p in proxy_scores:
-            lines.append(f"    {p.name:<22}{p.sequence_name}")
+            heading, _ = _heuristic_lines(p.name, heuristics)
+            lines.append(f"    {heading}")
+            lines.append(f"      {p.sequence_name}")
         lines.append("")
     elif proxy_scores:
         lines.append("HEURISTICS")
@@ -117,7 +132,10 @@ def format_vmin(selection, outcome, proxy_scores=(), order=()) -> str:
                 verdict = "the optimum"
             else:
                 verdict = f"+{p.excess * 100:.1f}% vapour"
-            lines.append(f"    {p.name:<22}{verdict}")
+            heading, citation = _heuristic_lines(p.name, heuristics)
+            lines.append(f"    {heading:<52}{verdict}")
+            if citation:
+                lines.append(f"      {citation}")
             lines.append(f"      {p.sequence_name}")
         lines.append("")
     return "\n".join(lines)

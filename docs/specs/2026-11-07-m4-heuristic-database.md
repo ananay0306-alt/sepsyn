@@ -1,10 +1,9 @@
-# M4, heuristic database and retrieval: DRAFT scope, not approved
+# M4, heuristic database and retrieval
 
 **Date:** 2026-11-07
-**Status:** DRAFT. Written so the next session starts from decisions, not a
-blank page. Nothing here is built, and no heuristic content was written,
-because the content is being drafted separately and inventing it would be
-exactly the unaudited guidance this project exists to prevent.
+**Status:** FIRST SLICE BUILT 2026-11-08. Decisions below approved by Ananay
+11-08. The sequencing heuristics are in `sepsyn/heuristics.yaml`, loaded and
+validated by `sepsyn/heuristicdb.py`, and cited in the `--vmin` report.
 
 ## What STATUS.md already fixes
 
@@ -46,3 +45,34 @@ send you to. A heuristic entry would carry:
 The four sequencing heuristics already exist in `sequencing/heuristics.py` and
 are already scored against the minimum-vapour optimum. Moving them into the
 database format first proves the schema on content that is already measured.
+
+## Decided 2026-11-08
+
+1. **Sources:** cited sources only. H-01 to H-04 are the list in
+   `Separation_heuristics.pdf`, attributed there to Douglas (1985). H-05,
+   easiest first, is not in that list; its earliest attribution found is
+   Harbert (1957), "Which Tower Goes Where?", known only through a secondary
+   review, so it carries `source_verified: false` and the report prints
+   "(citation unverified)". Research trail in Notion, project "sepsyn M4:
+   heuristic database sources".
+2. **Scope:** distillation sequencing only.
+3. **Retrieval:** plain filtering on `applies_when`.
+4. **A heuristic never changes a verdict.** Enforced by
+   `test_a_heuristic_can_NOT_change_the_answer`: with the database empty, the
+   report above HEURISTICS is identical.
+
+## Built in the first slice
+
+- `heuristics.yaml`: H-01 lightest first, H-02 most plentiful first, H-03
+  most difficult last, H-04 equimolar, H-05 easiest first.
+- A new `lightest_first` proxy (the direct sequence), so every Douglas
+  heuristic is scored.
+- Load-time refusals: missing source, unknown proxy, unknown calculation,
+  names outside `n_components`, unparseable condition, unknown conflict,
+  duplicate id, two entries claiming one proxy.
+
+## Not yet
+
+- The `--sequence` (cost) scorecard still prints proxy code names.
+- No MCP tool lists heuristics.
+- Confirm Harbert's wording, and the Douglas reference, from the originals.
