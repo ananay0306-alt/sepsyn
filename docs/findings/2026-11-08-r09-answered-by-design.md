@@ -94,9 +94,23 @@ the same q minimum-vapour selection already charged them. On the 4-alkane
 feed the five sequence costs moved +1.0, -2.2, +1.3, -3.9 and -3.5 %; the
 ranking is unchanged and the direct sequence still wins ($510,474/yr).
 
-Not yet possible: cross-validating a downstream column against DWSIM. The
-transport takes the feed as it arrives and cannot impose q, so the imposed
-q = 1 is refused by the feed-condition check, correctly.
+Cross-validating a downstream column: DONE 11-08. The DWSIM transport now
+imposes 0 <= q <= 1 by respecifying the feed by pressure and vapour fraction
+(`impose_feed_q`), and the feed-condition check, when q is imposed, also
+requires the two feed temperatures to agree within 2 K, because a vapour
+fraction of 0 cannot tell a saturated liquid from a subcooled one. The gate
+column at q = 1:
+
+| | feeds mismatched (as arrived) | same feed (q = 1 in both) |
+|---|---|---|
+| feed | BioSTEAM liquid 330 K, DWSIM vapour | 316.6 K and 316.7 K, saturated |
+| condenser duty | -24 % (refused) | **-15.5 %** |
+| reboiler duty | +72 % (refused) | **-10.9 %** |
+| end temperatures | 0.0 K | 0.0 K |
+
+The +72 % was the feed. What remains is the shortcut under-predicting by 11
+to 16 %, the same sign as on the four-alkane column. Recorded as
+`butane_pentane_hexane_24_19_q1.00.json`.
 
 ## Limits
 

@@ -77,6 +77,8 @@ class ColumnResult:
     distillate_T_K: float | None = None
     bottoms_T_K: float | None = None
     feed_H_kW: float | None = None
+    feed_T_K: float | None = None
+    """The feed's temperature as the column saw it, after any imposed q."""
     distillate_H_kW: float | None = None
     bottoms_H_kW: float | None = None
     biosteam_reported_diameter_m: float | None = None

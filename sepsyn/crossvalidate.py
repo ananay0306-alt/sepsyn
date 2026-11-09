@@ -68,21 +68,30 @@ class Comparison:
 FEED_STATE_TOLERANCE = 0.05
 
 
+# An imposed q puts the feed at its bubble point (q = 1) in each tool, by each
+# tool's own property package. Kelvin, not percent.
+FEED_T_TOLERANCE_K = 2.0
+
+
 def _feed_condition(spec, design, run) -> Assertion:
     """Do the two tools see the same feed? Measured on both sides.
 
-    An imposed q on the sepsyn side is a different feed from the one DWSIM is
-    handed, so it blocks. Otherwise sepsyn's q at column pressure gives the
-    vapour fraction it is modelling (1 - q, clipped to [0, 1]), and DWSIM's
-    flashed feed is read back. The previous check said "both sides take the
+    sepsyn's q at column pressure, imposed or measured, gives the vapour
+    fraction it models (1 - q, clipped to [0, 1]); DWSIM's flashed feed is read
+    back after the solve. A vapour fraction of 0 cannot tell a saturated liquid
+    from a subcooled one, so an imposed q also requires the two feed
+    temperatures to agree. The check this replaced said "both sides take the
     feed as it arrives", which held by construction: on 11-08 it passed a feed
     BioSTEAM kept liquid and DWSIM flashed to all vapour.
     """
-    if spec.feed_q is not None:
-        return Assertion("feed condition", False,
-                         f"sepsyn imposes q = {spec.feed_q}, DWSIM takes the "
-                         f"feed as it arrives; that is a different feed")
-    q, vf = design.feed_q, run.feed_vapour_fraction
+    if spec.feed_q is not None and run.feed_q != spec.feed_q:
+        return Assertion(
+            "feed condition", False,
+            f"sepsyn imposes q = {spec.feed_q}, DWSIM was given "
+            f"{'the feed as it arrived' if run.feed_q is None else f'q = {run.feed_q}'}"
+            f"; that is a different feed")
+    q = spec.feed_q if spec.feed_q is not None else design.feed_q
+    vf = run.feed_vapour_fraction
     if q is None or vf is None:
         return Assertion(
             "feed condition", None,
@@ -90,12 +99,22 @@ def _feed_condition(spec, design, run) -> Assertion:
             f"vapour fraction = {vf})")
     ours = min(1.0, max(0.0, 1.0 - q))
     ok = abs(ours - vf) <= FEED_STATE_TOLERANCE
-    return Assertion(
-        "feed condition", ok,
-        f"sepsyn q = {q:.3f} (vapour fraction {ours:.2f}), DWSIM vapour "
-        f"fraction {vf:.2f}" + ("" if ok else
-        ". The tools are modelling different feeds; BioSTEAM keeps the stream "
-        "it is handed while DWSIM flashes it at column pressure"))
+    detail = (f"sepsyn q = {q:.3f} (vapour fraction {ours:.2f}), DWSIM vapour "
+              f"fraction {vf:.2f}")
+    if spec.feed_q is not None:
+        tb, td = design.feed_T_K, run.feed_T_K_read_back
+        if tb is None or td is None:
+            return Assertion("feed condition", None,
+                             detail + "; feed temperatures not measured on "
+                             "both sides")
+        ok = ok and abs(tb - td) <= FEED_T_TOLERANCE_K
+        detail += f"; feed at {tb:.1f} K and {td:.1f} K"
+    if not ok:
+        detail += (". The tools are modelling different feeds" +
+                   ("; BioSTEAM keeps the stream it is handed while DWSIM "
+                    "flashes it at column pressure" if spec.feed_q is None
+                    else ""))
+    return Assertion("feed condition", ok, detail)
 
 
 def _refused(*assertions: Assertion) -> Comparison:

@@ -217,6 +217,7 @@ class BioSteamSimulator:
                     distillate_T_K=float(D.T),
                     bottoms_T_K=float(B.T),
                     feed_H_kW=float(s.H) / 3600.0,
+                    feed_T_K=float(s.T),
                     # BioSTEAM reports Diameter in FEET, and floors it at
                     # 0.914 m. The rules need the unfloored value; the cost
                     # belongs to the floored one, so both are carried.
@@ -291,6 +292,7 @@ class BioSteamSimulator:
                     distillate_T_K=float(D.T),
                     bottoms_T_K=float(B.T),
                     feed_H_kW=float(s.H) / 3600.0,
+                    feed_T_K=float(s.T),
                     distillate_H_kW=float(D.H) / 3600.0,
                     bottoms_H_kW=float(B.H) / 3600.0,
                     biosteam_reported_diameter_m=(

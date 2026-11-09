@@ -47,6 +47,11 @@ class DwsimRun:
     DWSIM actually built. None in a recording made before 11-08."""
     feed_stage_read_back: int | None = None
     feed_vapour_fraction: float | None = None
+    feed_T_K_read_back: float | None = None
+    """The feed's temperature after DWSIM flashed it. Equal to T_K for a feed
+    taken as it arrives; the bubble point for an imposed q = 1."""
+    feed_q: float | None = None
+    """The q the transport imposed, or None for a feed taken as it arrives."""
     """The feed's vapour fraction as DWSIM flashed it, at 330 K and column
     pressure for every recorded run. Read back, because DWSIM flashes the
     feed it is given and BioSTEAM does not, and the two can differ by the

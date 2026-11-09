@@ -18,6 +18,8 @@ nothing reused between runs:
     add_object            MaterialStream F, D, B; EnergyStream QC, QR;
                           DistillationColumn T1
     set_stream            F: T, P, compound_molar_flows
+    run_script            only for an imposed q: respecify F by pressure and
+                          vapour fraction, so DWSIM flashes it to that q
     configure_column      T1: stages, top_pressure, dP, both recovery specs,
                           Napthali-Sandholm, max_iterations
     connect_column_stream F feed at the mapped stage, D distillate, B bottoms,
@@ -116,7 +118,24 @@ def feed_to_mol_s(feed) -> dict[str, float]:
 
 def fixture_key(feed, spec, stages: int, feed_stage: int) -> str:
     names = "_".join(c.name.lower() for c in feed.components)
-    return f"{names}_{stages}_{feed_stage}.json"
+    # An imposed q is a different feed, so a different recording.
+    q = "" if spec.feed_q is None else f"_q{spec.feed_q:.2f}"
+    return f"{names}_{stages}_{feed_stage}{q}.json"
+
+
+def impose_feed_q(q: float) -> str:
+    """A run_script body that respecifies F by pressure and vapour fraction,
+    so DWSIM flashes it to q at the pressure already set. Only 0 <= q <= 1:
+    a vapour fraction cannot express a subcooled or superheated feed."""
+    if not 0.0 <= q <= 1.0:
+        raise ValueError(
+            f"the DWSIM transport can impose only 0 <= q <= 1, got {q}; a "
+            f"vapour fraction cannot express a subcooled or superheated feed")
+    return ('var ms = (MaterialStream)sim.GetFlowsheetSimulationObject("F"); '
+            'ms.SpecType = DWSIM.Interfaces.Enums.StreamSpec.'
+            'Pressure_and_VaporFraction; '
+            f'ms.Phases[2].Properties.molarfraction = {1.0 - q!r}; '
+            'return ms.SpecType.ToString();')
 
 
 class FixtureTransport:
@@ -207,6 +226,8 @@ async def _build_and_solve(session, feed, spec, stages, feed_stage, timeout_s):
     await call("set_stream", {"tag": "F", "temperature": feed.T_K,
                               "pressure": spec.pressure_Pa,
                               "compound_molar_flows": mol_s})
+    if spec.feed_q is not None:
+        await call("run_script", {"code": impose_feed_q(spec.feed_q)})
     condenser = {"type": "Component Recovery",
                  "compound": dwsim_name(spec.light_key),
                  "value": spec.lk_recovery_to_distillate * 100.0, "unit": "%"}
@@ -232,16 +253,17 @@ async def _build_and_solve(session, feed, spec, stages, feed_stage, timeout_s):
     # a default vapour fraction of 0, which read as "liquid" for a feed that
     # is all vapour (11-08).
     try:
-        feed_vf = float(json.loads(await call("get_stream", {"tag": "F"}))
-                        ["vapor_molar_fraction"])
+        fs = json.loads(await call("get_stream", {"tag": "F"}))
+        feed_vf, feed_T = float(fs["vapor_molar_fraction"]), float(fs["T_K"])
     except (ValueError, KeyError, TypeError):
-        feed_vf = None
+        feed_vf, feed_T = None, None
     common = dict(
         feed_mol_s=mol_s, T_K=feed.T_K, P_Pa=spec.pressure_Pa, stages=stages,
         feed_stage=feed_stage, condenser_spec=condenser,
         reboiler_spec=reboiler, property_package=PROPERTY_PACKAGE,
         solver=SOLVER, stages_read_back=stages_back,
-        feed_stage_read_back=feed_back, feed_vapour_fraction=feed_vf)
+        feed_stage_read_back=feed_back, feed_vapour_fraction=feed_vf,
+        feed_T_K_read_back=feed_T, feed_q=spec.feed_q)
 
     if not solved.get("converged"):
         # A solve that does not finish is a FACT about the case, not an

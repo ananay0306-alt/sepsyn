@@ -8,7 +8,7 @@ Updated 2026-11-08. Owner: Ananay Khandelwal (sole). Check this file; it is the 
 | | |
 |---|---|
 | Milestones done | **M1, M2, M3, M5 and M6 COMPLETE** plus the heuristics fold-in. **M4 first slice built 11-08** |
-| Tests | **537 passing** + 5 live DWSIM, ~4 min |
+| Tests | **544 passing** + 6 live DWSIM, ~2 min |
 | Blocking right now | nothing |
 | Waiting on you | nothing |
 | Newest | **11-08: R-09 answered by design in sequence verification; DWSIM gate passed; 09-10 "indirect only" withdrawn** |
@@ -39,6 +39,8 @@ two tools modelling different feeds (BioSTEAM liquid, DWSIM vapour); feed
 state is now measured in the equivalence check and the gap is refused.
 Downstream columns are now fed as saturated liquid (q = 1), as selection
 assumed; costs moved 1 to 4 %, ranking unchanged.
+DWSIM can now be given the same q = 1 feed, so a downstream column
+cross-validates: Pentane/Hexane at -15.5 % condenser, -10.9 % reboiler.
 `docs/findings/2026-11-08-r09-answered-by-design.md`
 
 ## Review of `overnight-v1`, 2026-11-08

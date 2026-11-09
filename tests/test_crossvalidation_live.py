@@ -58,3 +58,17 @@ def test_the_R09_raised_column_live():
     run = LiveTransport(timeout_s=300).run(feed, spec, c.dwsim_stages,
                                           c.dwsim_feed_stage)
     assert run.converged and run.distillate_T_K >= COOLING_WATER_T
+
+
+def test_a_downstream_column_live_at_q_one():
+    from dataclasses import replace
+
+    flows = {"Butane": 0.2, "Pentane": 59.4, "Hexane": 9.999978788248363}
+    feed = Feed(components=tuple(Component(n, resolve(n), f)
+                                 for n, f in flows.items()),
+                T_K=330.0, P_Pa=101325.0)
+    spec = ColumnSpec("Pentane", "Hexane", 0.99, 0.99, 117999.0, feed_q=1.0)
+    c = compare(feed, spec, BioSteamSimulator(),
+                DwsimSimulator(LiveTransport(timeout_s=300)))
+    print("\n" + format_comparison(c))
+    assert c.reportable

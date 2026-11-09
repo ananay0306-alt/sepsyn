@@ -223,8 +223,53 @@ def test_a_DWSIM_feed_state_never_read_back_is_UNKNOWN(matched):
     assert fc.holds is None and c.reportable is False
 
 
+def test_an_imposed_q_reaching_DWSIM_holds_when_both_feeds_agree(matched):
+    """q = 1 imposed on both sides, both feeds at their bubble points."""
+    feed, _, _, _ = matched
+    spec = replace(SPEC, feed_q=1.0)
+    ours = sepsyn_result(theoretical_stages=19, theoretical_feed_stage=10,
+                         feed_q=1.0, feed_T_K=353.3)
+    theirs = dwsim_run(feed_q=1.0, feed_vapour_fraction=0.0,
+                       feed_T_K_read_back=353.6)
+    c = compare(feed, spec, FakeBioSteam(ours), FakeDwsim(theirs))
+    (fc,) = [a for a in c.assertions if a.name == "feed condition"]
+    assert fc.holds is True, fc.detail
+
+
+def test_vapour_fraction_zero_is_NOT_enough_when_q_is_imposed(matched):
+    """A subcooled DWSIM feed also reads vapour fraction 0. The feed
+    temperatures must agree too."""
+    feed, _, _, _ = matched
+    spec = replace(SPEC, feed_q=1.0)
+    ours = sepsyn_result(theoretical_stages=19, theoretical_feed_stage=10,
+                         feed_q=1.0, feed_T_K=353.3)
+    theirs = dwsim_run(feed_q=1.0, feed_vapour_fraction=0.0,
+                       feed_T_K_read_back=298.15)
+    c = compare(feed, spec, FakeBioSteam(ours), FakeDwsim(theirs))
+    (fc,) = [a for a in c.assertions if a.name == "feed condition"]
+    assert fc.holds is False and not c.reportable
+
+
 def test_a_liquid_feed_in_both_tools_holds(matched):
     """sepsyn q = 1.3 (subcooled) and DWSIM vapour fraction 0."""
     c = compare(*matched)
     (fc,) = [a for a in c.assertions if a.name == "feed condition"]
     assert fc.holds is True
+
+
+def test_a_DOWNSTREAM_column_compares_once_both_tools_see_a_saturated_feed():
+    """11-08. The gate column as it really sits in the train: fed a saturated
+    liquid (q = 1) at 1.18 bar, imposed in BioSTEAM and, by vapour fraction,
+    in DWSIM. Feeds at 316.6 K and 316.7 K. The +72 % reboiler gap of the
+    mismatched feeds becomes -10.9 %, and the condenser -15.5 %: the shortcut
+    under-predicting, as on the four-alkane column."""
+    from dataclasses import replace
+    from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
+
+    feed, spec = gate_column()
+    c = compare(feed, replace(spec, feed_q=1.0), BioSteamSimulator(),
+                DwsimSimulator(FixtureTransport(FIXTURES)))
+    assert c.reportable, format_comparison(c)
+    duties = {g.quantity: g.relative for g in c.gaps if g.unit == "kW"}
+    assert -0.25 < duties["condenser duty"] < -0.05
+    assert -0.20 < duties["reboiler duty"] < -0.03

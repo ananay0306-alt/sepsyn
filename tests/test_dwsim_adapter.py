@@ -111,3 +111,25 @@ def test_a_feed_on_no_stage_or_two_is_NOT_a_feed_stage(reply):
 def test_a_script_error_reads_back_as_unknown():
     from sepsyn.simulators.dwsim_adapter import parse_read_back
     assert parse_read_back("Error: compilation failed") == (None, None)
+
+
+def test_an_imposed_q_is_a_different_recording():
+    from dataclasses import replace
+    from sepsyn.simulators.dwsim_adapter import fixture_key
+    assert fixture_key(bt_feed(), SPEC, 25, 13) == "benzene_toluene_25_13.json"
+    assert (fixture_key(bt_feed(), replace(SPEC, feed_q=1.0), 25, 13)
+            == "benzene_toluene_25_13_q1.00.json")
+
+
+@pytest.mark.parametrize("q", [-0.1, 1.2])
+def test_the_transport_refuses_a_q_a_vapour_fraction_cannot_express(q):
+    from sepsyn.simulators.dwsim_adapter import impose_feed_q
+    with pytest.raises(ValueError, match="only 0 <= q <= 1"):
+        impose_feed_q(q)
+
+
+def test_q_one_is_imposed_as_vapour_fraction_zero():
+    from sepsyn.simulators.dwsim_adapter import impose_feed_q
+    code = impose_feed_q(1.0)
+    assert "Pressure_and_VaporFraction" in code
+    assert "molarfraction = 0.0" in code
