@@ -62,6 +62,42 @@ class Comparison:
     dwsim_feed_stage: int | None = None
 
 
+# Vapour fractions within this are the same feed. q and vapour fraction are
+# measured on different property packages, so exact agreement is not expected;
+# the failure this exists to catch is a whole phase apart.
+FEED_STATE_TOLERANCE = 0.05
+
+
+def _feed_condition(spec, design, run) -> Assertion:
+    """Do the two tools see the same feed? Measured on both sides.
+
+    An imposed q on the sepsyn side is a different feed from the one DWSIM is
+    handed, so it blocks. Otherwise sepsyn's q at column pressure gives the
+    vapour fraction it is modelling (1 - q, clipped to [0, 1]), and DWSIM's
+    flashed feed is read back. The previous check said "both sides take the
+    feed as it arrives", which held by construction: on 11-08 it passed a feed
+    BioSTEAM kept liquid and DWSIM flashed to all vapour.
+    """
+    if spec.feed_q is not None:
+        return Assertion("feed condition", False,
+                         f"sepsyn imposes q = {spec.feed_q}, DWSIM takes the "
+                         f"feed as it arrives; that is a different feed")
+    q, vf = design.feed_q, run.feed_vapour_fraction
+    if q is None or vf is None:
+        return Assertion(
+            "feed condition", None,
+            f"feed state not measured on both sides (sepsyn q = {q}, DWSIM "
+            f"vapour fraction = {vf})")
+    ours = min(1.0, max(0.0, 1.0 - q))
+    ok = abs(ours - vf) <= FEED_STATE_TOLERANCE
+    return Assertion(
+        "feed condition", ok,
+        f"sepsyn q = {q:.3f} (vapour fraction {ours:.2f}), DWSIM vapour "
+        f"fraction {vf:.2f}" + ("" if ok else
+        ". The tools are modelling different feeds; BioSTEAM keeps the stream "
+        "it is handed while DWSIM flashes it at column pressure"))
+
+
 def _refused(*assertions: Assertion) -> Comparison:
     return Comparison(assertions=tuple(assertions), gaps=(), reportable=False,
                       unattributed=UNATTRIBUTED)
@@ -81,26 +117,18 @@ def compare(feed, spec, biosteam_sim, dwsim_sim) -> Comparison:
             "BioSTEAM did not report a theoretical stage count and feed stage, "
             "so there is no column to hand to DWSIM"))
 
-    # The DWSIM transport takes the feed as it arrives. An imposed q on the
-    # sepsyn side would be a different feed, so it blocks rather than passes.
-    feed_condition = Assertion(
-        "feed condition", spec.feed_q is None,
-        "both sides take the feed as it arrives" if spec.feed_q is None else
-        f"sepsyn imposes q = {spec.feed_q}, DWSIM takes the feed as it "
-        f"arrives; that is a different feed")
     try:
         stages = dwsim_stage_count(design.theoretical_stages,
                                    spec.condenser_type)
         feed_stage = dwsim_feed_stage(design.theoretical_feed_stage,
                                       design.theoretical_stages)
     except ValueError as exc:
-        return _refused(feed_condition,
-                        Assertion("stage count", None, str(exc)))
+        return _refused(Assertion("stage count", None, str(exc)))
 
     unattributed = UNATTRIBUTED + (
         (MULTICOMPONENT_FEED_STAGE,) if len(feed.components) > 2 else ())
     run = dwsim_sim.design_from_stages(feed, spec, stages, feed_stage)
-    assertions = (feed_condition,) + check_equivalence(
+    assertions = (_feed_condition(spec, design, run),) + check_equivalence(
         spec, design, stages, feed_stage, run)
     duties = (
         ("condenser duty", design.condenser_duty_kW, run.condenser_duty_kW),

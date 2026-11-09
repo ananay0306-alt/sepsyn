@@ -48,6 +48,7 @@ def dwsim_run(**over):
     # A fake column has what it is said to have, unless a test says otherwise.
     base.setdefault("stages_read_back", base["stages"])
     base.setdefault("feed_stage_read_back", base["feed_stage"])
+    base.setdefault("feed_vapour_fraction", 0.0)
     return DwsimRun(**base)
 
 

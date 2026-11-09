@@ -26,6 +26,8 @@ nothing reused between runs:
                           column itself, so equivalence checks what DWSIM
                           built rather than what was asked for
     solve                 with a timeout
+    get_stream            F: the vapour fraction DWSIM flashed the feed to,
+                          read after solve, never before
     get_results
 """
 import asyncio
@@ -226,12 +228,20 @@ async def _build_and_solve(session, feed, spec, stages, feed_stage, timeout_s):
         await call("run_script", {"code": READ_BACK}))
 
     solved = json.loads(await call("solve", {"timeout_seconds": timeout_s}))
+    # AFTER the solve: before it DWSIM has not flashed the stream and reports
+    # a default vapour fraction of 0, which read as "liquid" for a feed that
+    # is all vapour (11-08).
+    try:
+        feed_vf = float(json.loads(await call("get_stream", {"tag": "F"}))
+                        ["vapor_molar_fraction"])
+    except (ValueError, KeyError, TypeError):
+        feed_vf = None
     common = dict(
         feed_mol_s=mol_s, T_K=feed.T_K, P_Pa=spec.pressure_Pa, stages=stages,
         feed_stage=feed_stage, condenser_spec=condenser,
         reboiler_spec=reboiler, property_package=PROPERTY_PACKAGE,
         solver=SOLVER, stages_read_back=stages_back,
-        feed_stage_read_back=feed_back)
+        feed_stage_read_back=feed_back, feed_vapour_fraction=feed_vf)
 
     if not solved.get("converged"):
         # A solve that does not finish is a FACT about the case, not an

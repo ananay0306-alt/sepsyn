@@ -52,6 +52,9 @@ def test_the_R09_raised_column_live():
     c = compare(feed, spec, BioSteamSimulator(),
                 DwsimSimulator(LiveTransport(timeout_s=300)))
     print("\n" + format_comparison(c))
-    assert c.reportable
-    (td,) = [g for g in c.gaps if g.quantity == "distillate temperature"]
-    assert td.dwsim >= COOLING_WATER_T
+    # The feed is liquid to BioSTEAM and vapour to DWSIM, so no gap.
+    (fc,) = [a for a in c.assertions if a.name == "feed condition"]
+    assert fc.holds is False and not c.reportable
+    run = LiveTransport(timeout_s=300).run(feed, spec, c.dwsim_stages,
+                                          c.dwsim_feed_stage)
+    assert run.converged and run.distillate_T_K >= COOLING_WATER_T

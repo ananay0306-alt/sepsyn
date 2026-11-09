@@ -64,12 +64,33 @@ because the feed-stage numbering was wrong then (fixed 11-07). Recorded as
 - The undetermined-blocks-cost guard is now tested on ethane as light key,
   which condenses against cooling water at no pressure (Tc 305 K).
 
-## Not explained, and not part of this
+## The duty gap on the gate column: explained, and now refused
 
-On the gate column the duty gaps are large: condenser -24 %, reboiler +72 %.
-Qr - Qc differs between the tools by about 530 kW, which reads as the two
-treating the 330 K feed differently (superheated in DWSIM at column pressure,
-near saturated in BioSTEAM). A cross-validation question, open.
+The first comparison of this column reported condenser -24 %, reboiler +72 %.
+Root cause, measured: the two tools were modelling different feeds.
+
+| | BioSTEAM | DWSIM |
+|---|---|---|
+| feed as modelled | the stream as handed: liquid, 330 K, never flashed (thermosteam's default phase) | PT-flashed at 330 K and column pressure |
+| vapour fraction | 0 (q = 0.91 by enthalpy) | 1.00 |
+| enthalpy | 107.7 kW | about 600 kW (the same stream flashed in BioSTEAM) |
+
+That is about 490 of the 530 kW by which Qr - Qc differs. The equivalence
+check's "feed condition" said "both sides take the feed as it arrives", which
+held by construction. It is now measured: sepsyn's q against DWSIM's flashed
+vapour fraction, read back after the solve, within 0.05. This column now
+reports NO GAP; benzene/toluene and the alkanes, liquid in both tools, still
+report theirs unchanged.
+
+A first read-back was taken before the solve and returned 0.0, DWSIM's
+default for an unflashed stream. Moved after the solve and pinned in the
+transport's docstring.
+
+Open, and a sepsyn question rather than a cross-validation one: downstream
+columns in a sequence are fed at the ORIGINAL feed temperature
+(`evaluate._feed_from`), not at the state their parent column delivers them
+in, and BioSTEAM never flashes a stream it is handed. Here that is a 330 K
+"liquid" pentane feed above its bubble point.
 
 ## Limits
 

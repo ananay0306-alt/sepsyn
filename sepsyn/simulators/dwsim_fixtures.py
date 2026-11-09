@@ -46,6 +46,11 @@ class DwsimRun:
     request. `stages` and `feed_stage` are what was SENT; only these show what
     DWSIM actually built. None in a recording made before 11-08."""
     feed_stage_read_back: int | None = None
+    feed_vapour_fraction: float | None = None
+    """The feed's vapour fraction as DWSIM flashed it, at 330 K and column
+    pressure for every recorded run. Read back, because DWSIM flashes the
+    feed it is given and BioSTEAM does not, and the two can differ by the
+    whole latent heat (11-08). None before 11-08."""
 
 
 def save_fixture(path: str, run: DwsimRun) -> None:

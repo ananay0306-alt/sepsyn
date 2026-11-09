@@ -40,7 +40,8 @@ class FakeDwsim:
 
 @pytest.fixture
 def matched():
-    ours = sepsyn_result(theoretical_stages=19, theoretical_feed_stage=10)
+    ours = sepsyn_result(theoretical_stages=19, theoretical_feed_stage=10,
+                         feed_q=1.3)
     return FEED, SPEC, FakeBioSteam(ours), FakeDwsim(dwsim_run())
 
 
@@ -172,24 +173,58 @@ def test_the_recorded_alkane_run_reports_the_shortcut_UNDER_predicting():
     assert -0.35 < duties["reboiler duty"] < -0.15
 
 
+def gate_column():
+    flows = {"Butane": 0.2, "Pentane": 59.4, "Hexane": 9.999978788248363}
+    feed = Feed(components=tuple(Component(n, resolve(n), f)
+                                 for n, f in flows.items()),
+                T_K=330.0, P_Pa=101325.0)
+    return feed, ColumnSpec("Pentane", "Hexane", 0.99, 0.99, 117999.0)
+
+
 def test_the_R09_raised_column_is_buildable_and_condenses_in_DWSIM():
     """The gate for answering R-09 by design (11-08). Pentane/Hexane from the
     alkane train, 0.2 kmol/hr butane trace, raised from 1.157 to 1.180 bar so
     the designed distillate condenses against cooling water. September
     recorded this column as one a rigorous solve could not converge. The real
-    solve, replayed: it converges, every configuration assertion holds, and
-    DWSIM's condenser is at 313.6 K, above cooling water, as BioSTEAM says."""
+    solve, replayed: it converges, and DWSIM's condenser is at 313.6 K, above
+    cooling water. The duty GAP is not reportable; see the next test."""
     from sepsyn.properties import COOLING_WATER_T
+
+    feed, spec = gate_column()
+    run = FixtureTransport(FIXTURES).run(feed, spec, 24, 19)
+    assert run.converged
+    assert run.distillate_T_K >= COOLING_WATER_T
+    assert (run.stages_read_back, run.feed_stage_read_back) == (24, 19)
+
+
+def test_a_feed_the_two_tools_see_in_DIFFERENT_phases_reports_no_gap():
+    """11-08. At 330 K and 1.18 bar this feed is all vapour once flashed, and
+    DWSIM flashes it; BioSTEAM keeps the stream it was handed, a liquid,
+    q = 0.91. The old check said "both sides take the feed as it arrives",
+    which held by construction while the two tools modelled feeds about
+    490 kW apart, and the -24 % / +72 % duty gaps it let through were that
+    difference, not shortcut error."""
     from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
 
-    flows = {"Butane": 0.2, "Pentane": 59.4, "Hexane": 9.999978788248363}
-    feed = Feed(components=tuple(Component(n, resolve(n), f)
-                                 for n, f in flows.items()),
-                T_K=330.0, P_Pa=101325.0)
-    spec = ColumnSpec("Pentane", "Hexane", 0.99, 0.99, 117999.0)
+    feed, spec = gate_column()
     c = compare(feed, spec, BioSteamSimulator(),
                 DwsimSimulator(FixtureTransport(FIXTURES)))
-    assert c.reportable, format_comparison(c)
-    (td,) = [g for g in c.gaps if g.quantity == "distillate temperature"]
-    assert td.dwsim >= COOLING_WATER_T
-    assert abs(td.difference) < 0.2
+    assert c.reportable is False
+    (fc,) = [a for a in c.assertions if a.name == "feed condition"]
+    assert fc.holds is False
+    assert "vapour fraction" in fc.detail
+
+
+def test_a_DWSIM_feed_state_never_read_back_is_UNKNOWN(matched):
+    feed, spec, ours, _ = matched
+    c = compare(feed, spec, ours,
+                FakeDwsim(dwsim_run(feed_vapour_fraction=None)))
+    (fc,) = [a for a in c.assertions if a.name == "feed condition"]
+    assert fc.holds is None and c.reportable is False
+
+
+def test_a_liquid_feed_in_both_tools_holds(matched):
+    """sepsyn q = 1.3 (subcooled) and DWSIM vapour fraction 0."""
+    c = compare(*matched)
+    (fc,) = [a for a in c.assertions if a.name == "feed condition"]
+    assert fc.holds is True

@@ -32,6 +32,7 @@
   },
   "feed_stage": 6,
   "feed_stage_read_back": 6,
+  "feed_vapour_fraction": 0.0,
   "property_package": "Peng-Robinson (PR)",
   "reboiler_duty_kW": 589.822306,
   "reboiler_spec": {
