@@ -296,6 +296,12 @@ behaviour this code depends on.
 `STATUS.md` is the working tracker: what is done, every finding, and what is
 open.
 
+## Acknowledgements
+
+Thanks to Hafi, who I talked through the early direction and design decisions
+with. Several of the choices this tool is built on were settled in those
+conversations.
+
 ## License
 
 MIT. See `LICENSE`.
