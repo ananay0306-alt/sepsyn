@@ -24,7 +24,7 @@ def format_sequencing(ranking: Ranking, scorecard=None, tags=None) -> str:
     lines.append(f"  {ranking.evaluated} enumerated, {costable} costable, "
                  f"{len(ranking.undetermined)} undetermined, "
                  f"{len(ranking.eliminated)} eliminated")
-    if ranking.undetermined and costable <= 1:
+    if ranking.undetermined and costable == 1:
         # Say it plainly. A reader seeing "BEST SEQUENCE" naturally assumes it
         # beat the others; here it was the only candidate.
         lines.extend(_wrap(
@@ -32,9 +32,16 @@ def format_sequencing(ranking: Ranking, scorecard=None, tags=None) -> str:
             f"Only {costable} of {ranking.evaluated} could be costed, so the "
             f"best sequence below was not chosen over the others. It is the "
             f"only one the tool can stand behind."))
+    elif ranking.undetermined and costable == 0:
+        lines.extend(_wrap(
+            "  ",
+            f"None of {ranking.evaluated} could be costed. Each was designed, "
+            f"and each has a column the tool cannot endorse; reasons below."))
     lines.append("")
 
-    if ranking.winner is None:
+    if ranking.winner is None and ranking.undetermined:
+        lines.append("  No sequence can be costed. Reasons below.")
+    elif ranking.winner is None:
         lines.append("  No sequence could be designed. Reasons below.")
     else:
         w = ranking.winner

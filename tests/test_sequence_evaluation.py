@@ -58,8 +58,8 @@ def indirect_sequence():
 
 @pytest.fixture(scope="module")
 def outcome():
-    """The direct sequence. Designed, and UNDETERMINED: two of its columns
-    receive light traces their condensers cannot handle."""
+    """The direct sequence. Two of its columns receive light traces that
+    R-09 doubts; both doubts are answered by the designed condensers."""
     return evaluate_sequence(BioSteamSimulator(), alkane_feed(), direct_sequence())
 
 
@@ -79,15 +79,19 @@ def test_it_reports_a_total_cost_and_a_total_vapour_load(costable):
     assert costable.total_vapour_kmol_hr > 0
 
 
-def test_the_direct_sequence_is_designed_but_NOT_costed(outcome):
-    """It is feasible and every column has a design, but two columns screened
-    undetermined so no cost is reported. Previously this train was costed and
-    ranked as though nothing had been flagged."""
+def test_the_direct_sequence_is_costed_with_its_R09_doubts_ANSWERED(outcome):
+    """Corrected 2026-11-08. R-09 is now answered by designing each column, and
+    on this feed every doubt it raised is answered (two by a small pressure
+    raise). DWSIM converges the raised Pentane/Hexane column and agrees on its
+    condenser temperature to 0.1 K.
+
+    Costed because R-09 was answered by calculation, not because it stopped
+    firing: the answers travel on the columns that needed them."""
     assert outcome.feasible is True
-    assert outcome.costable is False
-    assert outcome.total_cost_USD_yr is None
-    assert "R-09" in outcome.undetermined_by
-    assert all(c.result is not None for c in outcome.columns)
+    assert outcome.costable is True
+    assert outcome.total_cost_USD_yr is not None
+    assert outcome.undetermined_by == ""
+    assert sum(1 for c in outcome.columns if c.resolved) == 2
 
 
 def test_the_total_is_the_sum_of_the_columns(costable):

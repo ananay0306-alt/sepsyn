@@ -28,6 +28,10 @@ class ColumnOutcome:
     vapour_kmol_hr: float | None
     screening: str = ""
     eliminated_by: str = ""
+    resolved: str = ""
+    """How an R-09 doubt was answered by calculation, when it was: the
+    designed condenser temperature, and the pressure raise if one was needed.
+    Empty when R-09 did not fire or could not be answered."""
 
 
 @dataclass(frozen=True)
@@ -103,6 +107,62 @@ def _feed_from(flows: dict[str, float], order: tuple[str, ...],
     )
 
 
+# Pressure step for answering R-09. Small, because the measured shortfalls are
+# fractions of a kelvin: the column pressure is chosen so the PURE light key
+# condenses exactly at the cooling-water limit, and the traces carried down a
+# train pull the real distillate just below it.
+R09_PRESSURE_STEP = 1.02
+
+
+def _undetermined_ids(verdicts) -> list[str]:
+    return [v.rule_id for v in verdicts
+            if v.fired and v.verdict == "undetermined"]
+
+
+def _answer_r09(sim, group_feed, node, pressure, lk_recovery, hk_recovery,
+                screen):
+    """Answer R-09 for one column by designing it, the calculation R-09's
+    own `requires` names.
+
+    R-09 screens on the lightest component present, at any amount. Down a
+    train that is a 1 % trace of propane, so it doubts condensers that the
+    designed column runs 28 to 156 K above cooling water (11-08, ten
+    n-alkanes). The designed distillate's temperature is the real answer. When
+    it falls short, by fractions of a kelvin where the pure light key sits at
+    the limit, the pressure is raised in small steps up to the same 30 bar cap
+    design.py uses, re-screening each time so no other rule is stepped past.
+
+    Returns ((pressure, verdicts, result), note) when answered, or
+    (None, note) when not. A note of "" means R-09 was not the question.
+    """
+    from sepsyn.design import MAX_PRESSURE_Pa
+    from sepsyn.properties import COOLING_WATER_T
+
+    P = pressure
+    while True:
+        verdicts, verdict = screen(P)
+        if verdict == "infeasible" or _undetermined_ids(verdicts) != ["R-09"]:
+            return None, ""
+        result = sim.design_multicomponent(group_feed, ColumnSpec(
+            node.light_key, node.heavy_key, lk_recovery, hk_recovery, P))
+        T = result.distillate_T_K if result.converged else None
+        if T is None:
+            return None, (f"R-09 could not be answered: the column did not "
+                          f"design at {P / 1e5:.3f} bar")
+        if T >= COOLING_WATER_T:
+            note = (f"R-09 answered: designed condenser at {T:.1f} K, at or "
+                    f"above cooling water at {COOLING_WATER_T:.2f} K")
+            if P > pressure:
+                note += (f", after raising the pressure from "
+                         f"{pressure / 1e5:.3f} to {P / 1e5:.3f} bar")
+            return (P, verdicts, result), note
+        if P >= MAX_PRESSURE_Pa:
+            return None, (f"R-09 stands: the designed condenser is at {T:.1f} "
+                          f"K, below cooling water at {COOLING_WATER_T:.2f} K, "
+                          f"even at the {MAX_PRESSURE_Pa / 1e5:.0f} bar cap")
+        P = min(P * R09_PRESSURE_STEP, MAX_PRESSURE_Pa)
+
+
 def evaluate_sequence(sim, feed: Feed, root: Node, *,
                       lk_recovery: float = 0.99,
                       hk_recovery: float = 0.99,
@@ -148,21 +208,40 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
         # behaved in the full mixture can be azeotropic once a component is
         # removed, and a sequence that creates such a pair partway down the
         # train has to be eliminated there rather than costed as if it worked.
-        record = build_property_record(
-            group_feed, column_P_Pa=pressure,
-            light_key=node.light_key, heavy_key=node.heavy_key,
-            column_P_basis=basis)
-        verdicts = evaluate_rules(rules, record)
-        verdict = overall_verdict(verdicts)
+        def screen(P):
+            record = build_property_record(
+                group_feed, column_P_Pa=P,
+                light_key=node.light_key, heavy_key=node.heavy_key,
+                column_P_basis=basis)
+            vs = evaluate_rules(rules, record)
+            return vs, overall_verdict(vs)
+
+        verdicts, verdict = screen(pressure)
+        designed, resolved, unanswered = None, "", ""
+        if verdict == "undetermined":
+            answer, note = _answer_r09(sim, group_feed, node, pressure,
+                                       lk_recovery, hk_recovery, screen)
+            if answer is not None:
+                P, verdicts, designed = answer
+                if P != pressure:
+                    basis = (f"{basis}; raised to {P / 1e5:.3f} bar so the "
+                             f"designed distillate condenses against cooling "
+                             f"water (R-09)")
+                pressure, resolved = P, note
+                # R-09 has been answered by the design; the verdict is what
+                # the other rules say.
+                verdict = overall_verdict(
+                    [v for v in verdicts if v.rule_id != "R-09"])
+            else:
+                unanswered = note
         if verdict == "undetermined":
             # Recorded and ALLOWED TO BLOCK. Previously this was stored on the
             # ColumnOutcome and ignored, so a sequence containing a column the
             # tool declined to endorse was costed and ranked anyway.
-            fired = ", ".join(v.rule_id for v in verdicts
-                              if v.fired and v.verdict == "undetermined")
+            fired = ", ".join(_undetermined_ids(verdicts))
             undetermined.append(
                 f"column {node.light_key}/{node.heavy_key} is UNDETERMINED "
-                f"({fired})")
+                f"({fired})" + (f": {unanswered}" if unanswered else ""))
         if verdict == "infeasible":
             fired = ", ".join(v.rule_id for v in verdicts
                               if v.fired and v.verdict == "infeasible")
@@ -173,9 +252,12 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
                                          eliminated_by=failure))
             return
 
-        spec = ColumnSpec(node.light_key, node.heavy_key,
-                          lk_recovery, hk_recovery, pressure)
-        result = sim.design_multicomponent(group_feed, spec)
+        if designed is not None:
+            result = designed
+        else:
+            spec = ColumnSpec(node.light_key, node.heavy_key,
+                              lk_recovery, hk_recovery, pressure)
+            result = sim.design_multicomponent(group_feed, spec)
         if not result.converged:
             failure = (f"column {'+'.join(node.light_group)}/"
                        f"{'+'.join(node.heavy_group)} did not converge: "
@@ -194,6 +276,7 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
             # there and pinned by a test here so the two cannot drift.
             vapour_kmol_hr=D * (result.reflux + 1.0),
             screening=verdict,
+            resolved=resolved,
         ))
         walk(node.light, dict(result.distillate))
         walk(node.heavy, dict(result.bottoms))

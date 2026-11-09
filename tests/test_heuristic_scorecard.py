@@ -42,21 +42,20 @@ def test_each_score_names_the_sequence_that_proxy_chose(card):
         assert s.sequence_name
 
 
-def test_every_classic_heuristic_names_a_route_the_tool_CANNOT_ENDORSE(card):
-    """Corrected 2026-09-10. This previously asserted all four proxies picked
-    the winner, which they did while undetermined columns were being costed.
+def test_every_heuristic_picks_the_winner_once_R09_is_answered(card):
+    """Corrected 2026-11-08. R-09 is now answered by designing each column, and
+    on this feed every doubt it raised is answered (two by a small pressure
+    raise). DWSIM converges the raised Pentane/Hexane column and agrees on its
+    condenser temperature to 0.1 K.
 
-    All four favour taking the lightest component off first. That route sends
-    light traces into low-pressure condensers, R-09 fires, and the sequence is
-    undetermined. So every textbook heuristic recommends a train sepsyn
-    declines to endorse, and none of them picks the survivor.
-
-    That is a finding about the heuristics, not a failure of the scorecard.
+    It previously asserted every heuristic named a route the tool could not
+    endorse. On this feed (40/30/20/10, lightest most plentiful) all five now
+    agree, and all five pick the cost winner, the direct sequence. Agreement
+    means the scorecard cannot tell them apart here, which the report says.
     """
-    assert not any(s.picked_winner for s in card.scores)
-    assert all(s.sequence_status == "undetermined" for s in card.scores)
+    assert all(s.picked_winner for s in card.scores)
+    assert not any(s.sequence_status == "undetermined" for s in card.scores)
     assert card.proxies_agree is True
-
 
 def test_the_cost_penalty_of_a_correct_proxy_is_zero(card):
     for s in card.scores:

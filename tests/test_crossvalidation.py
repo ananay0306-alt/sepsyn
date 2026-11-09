@@ -170,3 +170,26 @@ def test_the_recorded_alkane_run_reports_the_shortcut_UNDER_predicting():
     assert "feed stage placement" in format_comparison(c)
     assert -0.80 < duties["condenser duty"] < -0.60
     assert -0.35 < duties["reboiler duty"] < -0.15
+
+
+def test_the_R09_raised_column_is_buildable_and_condenses_in_DWSIM():
+    """The gate for answering R-09 by design (11-08). Pentane/Hexane from the
+    alkane train, 0.2 kmol/hr butane trace, raised from 1.157 to 1.180 bar so
+    the designed distillate condenses against cooling water. September
+    recorded this column as one a rigorous solve could not converge. The real
+    solve, replayed: it converges, every configuration assertion holds, and
+    DWSIM's condenser is at 313.6 K, above cooling water, as BioSTEAM says."""
+    from sepsyn.properties import COOLING_WATER_T
+    from sepsyn.simulators.biosteam_adapter import BioSteamSimulator
+
+    flows = {"Butane": 0.2, "Pentane": 59.4, "Hexane": 9.999978788248363}
+    feed = Feed(components=tuple(Component(n, resolve(n), f)
+                                 for n, f in flows.items()),
+                T_K=330.0, P_Pa=101325.0)
+    spec = ColumnSpec("Pentane", "Hexane", 0.99, 0.99, 117999.0)
+    c = compare(feed, spec, BioSteamSimulator(),
+                DwsimSimulator(FixtureTransport(FIXTURES)))
+    assert c.reportable, format_comparison(c)
+    (td,) = [g for g in c.gaps if g.quantity == "distillate temperature"]
+    assert td.dwsim >= COOLING_WATER_T
+    assert abs(td.difference) < 0.2

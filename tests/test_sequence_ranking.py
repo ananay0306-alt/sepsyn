@@ -92,17 +92,17 @@ def test_sweep_evaluates_every_sequence_for_a_real_feed():
     assert r.winner.total_cost_USD_yr > 0
 
 
-def test_the_INDIRECT_sequence_wins_once_undetermined_columns_block():
-    """Corrected 2026-09-10. This previously asserted the DIRECT sequence won.
+def test_the_DIRECT_sequence_wins_once_R09_is_answered():
+    """Corrected 2026-11-08. R-09 is now answered by designing each column, and
+    on this feed every doubt it raised is answered (two by a small pressure
+    raise). DWSIM converges the raised Pentane/Hexane column and agrees on its
+    condenser temperature to 0.1 K.
 
-    Four of the five sequences send light traces into low-pressure condensers,
-    R-09 fires, and they are undetermined rather than costable. The survivor
-    removes the heaviest component first, keeping the light ends together in
-    high-pressure columns.
-
-    The direct sequence was formerly reported as the winner at $462,010/yr on
-    this feed, computed from columns the tool had itself flagged.
+    Corrected twice. M3 reported the direct sequence as winner; 09-10 blocked
+    it as undetermined and the indirect sequence "won" alone; with R-09
+    answered all five cost and the direct sequence wins again.
     """
     r = sweep(BioSteamSimulator(), alkane_feed(), ORDER)
-    assert len(r.undetermined) == 4
-    assert r.winner.name.startswith("Propane+Butane+Pentane/Hexane")
+    assert len(r.undetermined) == 0
+    assert r.winner.name.startswith("Propane/Butane+Pentane+Hexane |"
+                                    " Butane/Pentane+Hexane")

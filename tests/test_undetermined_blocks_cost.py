@@ -28,18 +28,34 @@ def feed_of(flows, T_K=330.0):
                 T_K=T_K, P_Pa=101325.0)
 
 
+ETHANE_ORDER = ("Ethane", "Propane", "Butane", "Pentane")
+
+
 @pytest.fixture(scope="module")
 def adversarial():
-    """The feed whose winning sequence was reported at $513,461/yr while two
-    of its three columns were flagged undetermined."""
-    root = next(iter(enumerate_sequences(ORDER)))
-    return evaluate_sequence(BioSteamSimulator(), feed_of((10., 20., 60., 10.)),
-                             root)
+    """A column whose R-09 doubt CANNOT be answered: ethane's critical point is
+    305 K, so its overhead does not condense against cooling water at any
+    pressure. The guard is tested here, where it must hold.
+
+    Corrected 2026-11-08. R-09 is now answered by designing the column: the condenser temperature of the designed distillate, raising the pressure in small steps when the traces pull it just below cooling water. DWSIM converges the raised column and agrees on its condenser temperature to 0.1 K, so the September non-convergence these tests were built on does not reproduce. The alkane feed that used to sit here is now costable; see
+    test_the_adversarial_alkane_feed_is_now_fully_costable."""
+    feed = Feed(components=tuple(Component(n, resolve(n), f) for n, f in
+                                 zip(ETHANE_ORDER, (10., 20., 60., 10.))),
+                T_K=330.0, P_Pa=101325.0)
+    root = next(iter(enumerate_sequences(ETHANE_ORDER)))
+    return evaluate_sequence(BioSteamSimulator(), feed, root)
 
 
 def test_an_undetermined_column_is_recorded_on_the_sequence(adversarial):
     assert adversarial.undetermined_by
     assert "R-09" in adversarial.undetermined_by
+
+
+def test_an_unanswerable_R09_says_what_was_measured(adversarial):
+    """Not just that it is undetermined: the designed condenser temperature,
+    and that the pressure cap was reached."""
+    assert "even at the 30 bar cap" in adversarial.undetermined_by
+    assert " K, below cooling water" in adversarial.undetermined_by
 
 
 def test_an_undetermined_sequence_reports_NO_COST(adversarial):
@@ -81,38 +97,35 @@ def test_ranking_puts_undetermined_sequences_in_their_own_bucket():
     assert unk not in r.near_optimal
 
 
-def test_only_the_INDIRECT_sequence_survives_on_the_adversarial_feed():
-    """The result that overturns the M3 answer.
+def test_the_adversarial_alkane_feed_is_now_fully_costable():
+    """Corrected 2026-11-08. R-09 is now answered by designing the column: the condenser temperature of the designed distillate, raising the pressure in small steps when the traces pull it just below cooling water. DWSIM converges the raised column and agrees on its condenser temperature to 0.1 K, so the September non-convergence these tests were built on does not reproduce.
 
-    Four of the five sequences put light traces into a low-pressure condenser
-    and are undetermined. The one that survives removes the HEAVIEST component
-    first, so the light components stay together and every condenser operates
-    where its overhead actually condenses.
-
-    The previously reported winner was the direct sequence at $513,461/yr, and
-    it is not costable at all. The only sequence the tool can stand behind
-    costs 55 percent more.
-    """
+    Measured 11-08: all five sequences cost, and the direct sequence wins at
+    about $505,000/yr, close to the $513,461 M3 first reported. September's
+    "only the indirect sequence survives, at 55 % more" rested on the doubt
+    this change answers."""
     r = sweep(BioSteamSimulator(), feed_of((10., 20., 60., 10.)), ORDER)
-    assert len(r.undetermined) == 4
-    assert len(r.all_feasible) == 1
-    assert r.winner is not None
-    assert r.winner.name.startswith("Propane+Butane+Pentane/Hexane")
-    assert r.winner.total_cost_USD_yr == pytest.approx(794995.0, rel=0.02)
+    assert len(r.undetermined) == 0
+    assert len(r.all_feasible) == 5
+    assert r.winner.name.startswith("Propane/Butane+Pentane+Hexane |"
+                                    " Butane/Pentane+Hexane")
+    assert r.winner.total_cost_USD_yr == pytest.approx(505171.0, rel=0.02)
 
 
-def test_the_previously_reported_winner_is_now_UNCOSTABLE():
-    """The direct sequence, reported at $513,461/yr before undetermined
-    columns were allowed to block. It is still feasible: it may be fine with a
-    partial condenser. It is no longer costable."""
-    r = sweep(BioSteamSimulator(), feed_of((10., 20., 60., 10.)), ORDER)
-    direct = [o for o in r.undetermined
-              if o.name.startswith("Propane/Butane+Pentane+Hexane |"
-                                   " Butane/Pentane+Hexane")]
-    assert direct, "the direct sequence must be present and undetermined"
-    assert direct[0].total_cost_USD_yr is None
-    assert direct[0].feasible is True
-    assert "R-09" in direct[0].undetermined_by
+def test_the_direct_sequence_records_HOW_its_R09_doubts_were_answered():
+    """Costable is not the same as unflagged. Each column R-09 doubted carries
+    the measured answer. Measured 11-08: Butane/Pentane+Hexane condenses at
+    313.4 K as designed; Pentane/Hexane needed 1.157 to 1.180 bar."""
+    root = next(iter(enumerate_sequences(ORDER)))
+    o = evaluate_sequence(BioSteamSimulator(), feed_of((10., 20., 60., 10.)),
+                          root)
+    by_lk = {c.split.light_key: c for c in o.columns}
+    assert by_lk["Propane"].resolved == ""
+    assert "R-09 answered" in by_lk["Butane"].resolved
+    assert "raising" not in by_lk["Butane"].resolved
+    raised = by_lk["Pentane"]
+    assert "from 1.157 to 1.180 bar" in raised.resolved
+    assert "raised to 1.180 bar" in raised.pressure_basis
 
 
 def test_a_clean_feed_still_costs_and_ranks():

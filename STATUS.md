@@ -8,10 +8,10 @@ Updated 2026-11-08. Owner: Ananay Khandelwal (sole). Check this file; it is the 
 | | |
 |---|---|
 | Milestones done | **M1, M2, M3, M5 and M6 COMPLETE** plus the heuristics fold-in. **M4 first slice built 11-08** |
-| Tests | **530 passing** + 4 live DWSIM, ~160 s |
+| Tests | **533 passing** + 5 live DWSIM, ~150 s |
 | Blocking right now | nothing |
 | Waiting on you | nothing |
-| Newest | **11-08: overnight work reviewed, six findings fixed, merged to `main`** |
+| Newest | **11-08: R-09 answered by design in sequence verification; DWSIM gate passed; 09-10 "indirect only" withdrawn** |
 | Published | **public** at github.com/ananay0306-alt/sepsyn, MIT |
 
 ## Overnight 2026-11-07, branch `overnight-v1` (MERGED 11-08 after review)
@@ -26,6 +26,17 @@ Updated 2026-11-08. Owner: Ananay Khandelwal (sole). Check this file; it is the 
 | BioSTEAM 2x Rmin question | CLOSED AS A KNOWN LIMIT 11-08. Rigorous V 59.6 at 21 stages, 39.6 at 30; three more configurations above 30 (reflux specs, flow specs, Wang-Henke) also failed to converge. Unresolved which V_min is right; both are consistent with every converged point | `docs/findings/2026-11-07-the-alkane-bound-test.md` |
 | M4 | FIRST SLICE 11-08. Five cited sequencing heuristics, scored against the minimum-vapour optimum in `--vmin`; easiest-first's citation (Harbert 1957) marked unverified | `sepsyn/heuristics.yaml`, `docs/specs/2026-11-07-m4-heuristic-database.md` |
 | Hafi's condenser/reboiler point | DROPPED 11-08. Hafi has left the project and the point was never transcribed. The measured condenser/reboiler gap is tracked under the alkane bound test | |
+
+## R-09 answered by design, 2026-11-08
+
+Sequence verification now answers R-09 with the designed condenser
+temperature, raising pressure in 2 % steps (to 30 bar) when traces pull it
+just below cooling water. Ten alkanes: 8 of 9 columns verify (the ninth is
+R-11). DWSIM converges the raised Pentane/Hexane column and matches its
+condenser temperature to 0.1 K. The 4-alkane adversarial feed is fully
+costable again; the direct sequence wins. Open: a 530 kW feed-enthalpy
+difference between the tools on that column.
+`docs/findings/2026-11-08-r09-answered-by-design.md`
 
 ## Review of `overnight-v1`, 2026-11-08
 

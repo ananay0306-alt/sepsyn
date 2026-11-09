@@ -93,6 +93,8 @@ def format_vmin(selection, outcome, proxy_scores=(), order=(),
                 f"{'+'.join(c.split.heavy_group)}")
         lines.append(f"    {name:<40}{c.pressure_Pa / 1e5:>8.2f} bar   "
                      f"{c.screening}")
+        if c.resolved:
+            lines.append(f"      {c.resolved}")
     if outcome.eliminated_by:
         lines.append(f"  ELIMINATED: {outcome.eliminated_by}")
     elif outcome.undetermined_by:

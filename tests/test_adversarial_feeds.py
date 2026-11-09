@@ -63,12 +63,24 @@ def test_the_scorecard_says_what_became_of_each_proxys_choice(middle_heavy):
     adversarial. What changed is that NONE of their choices is costable: they
     all route light traces into low-pressure condensers. The scorecard now
     reports that as its own status rather than as a cost penalty.
+
+    Corrected 2026-11-08. R-09 is now answered by designing each column, and
+    on this feed every doubt it raised is answered (two by a small pressure
+    raise). DWSIM converges the raised Pentane/Hexane column and agrees on its
+    condenser temperature to 0.1 K.
+
+    The proxies still disagree, which keeps the feed adversarial. The three
+    that take the light end off first pick the winner; most-plentiful and
+    equimolar pick a costable runner-up.
     """
     _, _, card = middle_heavy
+    by = {s.name: s for s in card.scores}
     assert len({s.sequence_name for s in card.scores}) >= 2
-    assert not any(s.picked_winner for s in card.scores)
-    assert all(s.sequence_status in ("undetermined", "eliminated")
-               for s in card.scores)
+    assert all(by[n].picked_winner for n in
+               ("lightest_first", "easiest_first", "hardest_last"))
+    for n in ("most_plentiful_first", "equimolar"):
+        assert not by[n].picked_winner
+        assert by[n].sequence_status == "costable"
 
 
 def test_a_miss_is_EXPLAINED_rather_than_left_blank(middle_heavy):

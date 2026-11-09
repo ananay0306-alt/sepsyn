@@ -69,22 +69,29 @@ def test_the_verified_sequence_is_the_one_that_was_SELECTED():
 def test_an_undetermined_column_still_blocks_a_cost_after_selection():
     """Selection is a bound problem and cannot see condenser feasibility.
 
-    MEASURED on this feed: minimum vapour picks the direct sequence, and two of
-    its three columns then screen UNDETERMINED under R-09 -- they run at 3.78
-    and 1.16 bar, where their overheads will not condense against cooling
-    water. Stage 1 has no way to know that; stage 2 does, and it still
-    withholds the cost. The pipeline does not get to overrule the screening
-    just because minimum vapour liked the route.
-
-    This is the case that makes the two-stage design worth its cost.
+    Corrected 2026-11-08. R-09 is now answered by designing each column, and
+    on this feed every doubt it raised is answered (two by a small pressure
+    raise). DWSIM converges the raised Pentane/Hexane column and agrees on its
+    condenser temperature to 0.1 K. So the guard is shown on ethane, which condenses against cooling
+    water at no pressure: minimum vapour still selects a sequence, stage 2
+    still withholds the cost. The pipeline does not get to overrule the
+    screening just because minimum vapour liked the route.
     """
-    _, outcome = select_and_verify(
-        BioSteamSimulator(), alkane_feed(), ORDER)
+    order = ("Ethane", "Propane", "Butane", "Pentane")
+    feed = Feed(components=tuple(Component(n, resolve(n), f) for n, f in
+                                 zip(order, (10.0, 20.0, 60.0, 10.0))),
+                T_K=330.0, P_Pa=101325.0)
+    _, outcome = select_and_verify(BioSteamSimulator(), feed, order)
     assert "R-09" in outcome.undetermined_by
     assert outcome.total_cost_USD_yr is None
     assert not outcome.costable
     assert outcome.feasible          # undetermined is NOT eliminated
 
+
+def test_on_the_alkane_feed_R09_is_answered_and_the_sequence_costs():
+    _, outcome = select_and_verify(BioSteamSimulator(), alkane_feed(), ORDER)
+    assert outcome.costable
+    assert any("R-09 answered" in c.resolved for c in outcome.columns)
 
 def test_selection_evaluates_ten_split_pairs_on_a_four_component_feed():
     """Enumeration would design 5 sequences x 3 columns = 15."""
