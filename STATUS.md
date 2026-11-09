@@ -8,7 +8,7 @@ Updated 2026-11-08. Owner: Ananay Khandelwal (sole). Check this file; it is the 
 | | |
 |---|---|
 | Milestones done | **M1, M2, M3, M5 and M6 COMPLETE** plus the heuristics fold-in. **M4 first slice built 11-08** |
-| Tests | **536 passing** + 5 live DWSIM, ~4 min |
+| Tests | **537 passing** + 5 live DWSIM, ~4 min |
 | Blocking right now | nothing |
 | Waiting on you | nothing |
 | Newest | **11-08: R-09 answered by design in sequence verification; DWSIM gate passed; 09-10 "indirect only" withdrawn** |
@@ -37,7 +37,8 @@ condenser temperature to 0.1 K. The 4-alkane adversarial feed is fully
 costable again; the direct sequence wins. The duty gap on that column was the
 two tools modelling different feeds (BioSTEAM liquid, DWSIM vapour); feed
 state is now measured in the equivalence check and the gap is refused.
-Open: downstream columns are fed at the original feed temperature.
+Downstream columns are now fed as saturated liquid (q = 1), as selection
+assumed; costs moved 1 to 4 %, ranking unchanged.
 `docs/findings/2026-11-08-r09-answered-by-design.md`
 
 ## Review of `overnight-v1`, 2026-11-08

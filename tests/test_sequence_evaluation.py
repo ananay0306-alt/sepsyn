@@ -158,3 +158,17 @@ def test_every_enumerated_sequence_can_be_evaluated():
     outs = [evaluate_sequence(sim, feed, r) for r in enumerate_sequences(ORDER)]
     assert len(outs) == 5
     assert all(o.feasible for o in outs), [o.eliminated_by for o in outs if not o.feasible]
+
+
+def test_downstream_columns_are_fed_SATURATED_LIQUID_the_root_as_it_arrives(
+        outcome):
+    """11-08. Every downstream column used to be fed at the ORIGINAL feed's
+    temperature, 330 K, and BioSTEAM never flashes what it is handed: the
+    Pentane/Hexane column saw a 330 K 'liquid' above its bubble point. A
+    product arrives from its parent as a saturated liquid, which is also the
+    q = 1 minimum-vapour selection charges downstream columns, so design and
+    selection now agree on it."""
+    root, *downstream = outcome.columns
+    assert root.result.feed_q != pytest.approx(1.0)
+    assert downstream
+    assert all(c.result.feed_q == pytest.approx(1.0) for c in downstream)

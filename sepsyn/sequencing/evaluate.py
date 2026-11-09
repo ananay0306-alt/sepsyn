@@ -113,6 +113,15 @@ def _feed_from(flows: dict[str, float], order: tuple[str, ...],
 # train pull the real distillate just below it.
 R09_PRESSURE_STEP = 1.02
 
+# The state a product arrives in at the next column: a saturated liquid, at
+# that column's pressure. Before 11-08 every downstream column was fed at the
+# ORIGINAL feed's temperature, and BioSTEAM does not flash a stream it is
+# handed, so a 330 K pentane bottoms reached a 1.18 bar column as a "liquid"
+# above its bubble point. q = 1 is also what minimum-vapour selection charges
+# downstream columns (vmin.pipeline, downstream_q), so selection and
+# verification now price the same feed.
+DOWNSTREAM_FEED_Q = 1.0
+
 
 def _undetermined_ids(verdicts) -> list[str]:
     return [v.rule_id for v in verdicts
@@ -120,7 +129,7 @@ def _undetermined_ids(verdicts) -> list[str]:
 
 
 def _answer_r09(sim, group_feed, node, pressure, lk_recovery, hk_recovery,
-                screen):
+                screen, feed_q=None):
     """Answer R-09 for one column by designing it, the calculation R-09's
     own `requires` names.
 
@@ -144,7 +153,8 @@ def _answer_r09(sim, group_feed, node, pressure, lk_recovery, hk_recovery,
         if verdict == "infeasible" or _undetermined_ids(verdicts) != ["R-09"]:
             return None, ""
         result = sim.design_multicomponent(group_feed, ColumnSpec(
-            node.light_key, node.heavy_key, lk_recovery, hk_recovery, P))
+            node.light_key, node.heavy_key, lk_recovery, hk_recovery, P,
+            feed_q=feed_q))
         T = result.distillate_T_K if result.converged else None
         if T is None:
             return None, (f"R-09 could not be answered: the column did not "
@@ -183,7 +193,10 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
     exposure_columns: dict[str, int] = {}
     failure = ""
 
-    def walk(node: Node, flows: dict[str, float]) -> None:
+    def walk(node: Node, flows: dict[str, float],
+             feed_q: float | None = None) -> None:
+        """feed_q None for the fresh feed, taken as it arrives; a product of
+        another column arrives as DOWNSTREAM_FEED_Q."""
         nonlocal failure
         if node.is_leaf or failure:
             return
@@ -220,7 +233,8 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
         designed, resolved, unanswered = None, "", ""
         if verdict == "undetermined":
             answer, note = _answer_r09(sim, group_feed, node, pressure,
-                                       lk_recovery, hk_recovery, screen)
+                                       lk_recovery, hk_recovery, screen,
+                                       feed_q)
             if answer is not None:
                 P, verdicts, designed = answer
                 if P != pressure:
@@ -256,7 +270,8 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
             result = designed
         else:
             spec = ColumnSpec(node.light_key, node.heavy_key,
-                              lk_recovery, hk_recovery, pressure)
+                              lk_recovery, hk_recovery, pressure,
+                              feed_q=feed_q)
             result = sim.design_multicomponent(group_feed, spec)
         if not result.converged:
             failure = (f"column {'+'.join(node.light_group)}/"
@@ -278,8 +293,8 @@ def evaluate_sequence(sim, feed: Feed, root: Node, *,
             screening=verdict,
             resolved=resolved,
         ))
-        walk(node.light, dict(result.distillate))
-        walk(node.heavy, dict(result.bottoms))
+        walk(node.light, dict(result.distillate), DOWNSTREAM_FEED_Q)
+        walk(node.heavy, dict(result.bottoms), DOWNSTREAM_FEED_Q)
 
     walk(root, {c.name: c.flow_kmol_hr for c in feed.components})
 

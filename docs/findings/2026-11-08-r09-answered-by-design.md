@@ -86,11 +86,17 @@ A first read-back was taken before the solve and returned 0.0, DWSIM's
 default for an unflashed stream. Moved after the solve and pinned in the
 transport's docstring.
 
-Open, and a sepsyn question rather than a cross-validation one: downstream
-columns in a sequence are fed at the ORIGINAL feed temperature
-(`evaluate._feed_from`), not at the state their parent column delivers them
-in, and BioSTEAM never flashes a stream it is handed. Here that is a 330 K
-"liquid" pentane feed above its bubble point.
+Downstream columns in a sequence were fed at the ORIGINAL feed temperature,
+not at the state their parent delivers them in; here that was a 330 K
+"liquid" pentane feed above its bubble point. FIXED 11-08: every downstream
+column is designed with a saturated-liquid feed (q = 1) at its own pressure,
+the same q minimum-vapour selection already charged them. On the 4-alkane
+feed the five sequence costs moved +1.0, -2.2, +1.3, -3.9 and -3.5 %; the
+ranking is unchanged and the direct sequence still wins ($510,474/yr).
+
+Not yet possible: cross-validating a downstream column against DWSIM. The
+transport takes the feed as it arrives and cannot impose q, so the imposed
+q = 1 is refused by the feed-condition check, correctly.
 
 ## Limits
 
