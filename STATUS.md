@@ -25,7 +25,7 @@ Updated 2026-11-08. Owner: Ananay Khandelwal (sole). Check this file; it is the 
 | M5, LLM interface | DONE as an MCP server: five tools wrapping the CLI, tested over real stdio | `sepsyn/mcp_server.py` |
 | BioSTEAM 2x Rmin question | CLOSED AS A KNOWN LIMIT 11-08. Rigorous V 59.6 at 21 stages, 39.6 at 30; three more configurations above 30 (reflux specs, flow specs, Wang-Henke) also failed to converge. Unresolved which V_min is right; both are consistent with every converged point | `docs/findings/2026-11-07-the-alkane-bound-test.md` |
 | M4 | DONE 11-09 (both reports cite). FIRST SLICE 11-08. Five cited sequencing heuristics, scored against the minimum-vapour optimum in `--vmin`; easiest-first's citation (Harbert 1957) marked unverified | `sepsyn/heuristics.yaml`, `docs/specs/2026-11-07-m4-heuristic-database.md` |
-| Hafi's condenser/reboiler point | DROPPED 11-08. Hafi has left the project and the point was never transcribed. The measured condenser/reboiler gap is tracked under the alkane bound test | |
+| Hafi's condenser/reboiler point | DROPPED 11-08. The point was never written down. The measured condenser/reboiler gap is tracked under the alkane bound test | |
 
 ## R-09 answered by design, 2026-11-08
 
@@ -124,7 +124,7 @@ Run it:
   heavy non-keys; on the binary the two agree. That is the next question.
 - ~~No azeotrope gate before selection.~~ DONE 11-07.
 - ~~M2 Task 6 never built; Task 3 constants UNSET.~~ DONE 11-07.
-- ~~Hafi's condenser/reboiler point, never transcribed.~~ DROPPED 11-08: Hafi left the project.
+- ~~Hafi's condenser/reboiler point, never transcribed.~~ DROPPED 11-08: never written down.
 - ~~Water/glycerol UNIFAC false positive.~~ FIXED 11-07 by measured data.
 
 ## Decisions waiting on you

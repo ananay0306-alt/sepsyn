@@ -1,5 +1,7 @@
 # sepsyn
 
+Built by Ananay Khandelwal, Chemical Engineering, Penn State.
+
 Screening and preliminary design for distillation, from a single column to the
 order of columns for a ten-component feed, built so that **every assumption it
 makes is written down**.
