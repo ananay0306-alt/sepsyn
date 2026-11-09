@@ -157,6 +157,7 @@ def rank_sequences(feed: dict[str, float], order: list[str],
 def find_azeotropes(components: list[str], P_Pa: float = 101325.0) -> str:
     """Scan every pair for an azeotrope at this pressure, by searching for
     relative volatility crossing one at the bubble point."""
+    from sepsyn.azeotropes import SCAN_POINTS
     from sepsyn.azeotropes import find_azeotropes as search
 
     if len(components) < 2:
@@ -165,11 +166,8 @@ def find_azeotropes(components: list[str], P_Pa: float = 101325.0) -> str:
         found = search(components, P_Pa)
     if not found:
         return (f"No azeotrope found among {', '.join(components)} at "
-                f"{P_Pa / 1e5:.3f} bar (201-point scan per pair).")
-    return "\n".join(
-        f"{a.components[0]}/{a.components[1]}: x = {a.x[0]:.3f} "
-        f"{a.components[0]}, {a.T_K:.1f} K, {a.P_Pa / 1e5:.3f} bar"
-        for a in found)
+                f"{P_Pa / 1e5:.3f} bar ({SCAN_POINTS}-point scan per pair).")
+    return "\n".join(a.describe() for a in found)
 
 
 if __name__ == "__main__":

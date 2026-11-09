@@ -222,8 +222,8 @@ def build_property_record(
         # lle.py), while the actual key pair methanol/water does not.
         pair = ([light_key, heavy_key] if light_key and heavy_key
                 else list(feed.names))
-        splits = find_liquid_split(pair, P) is not None
         overrides = tuple(measured_miscible_pairs(pair))
+        splits = find_liquid_split(pair, P, overrides) is not None
         # The SAME pair the liquid-liquid check uses, and for the same reason.
         # An azeotrope is a property of the separation being attempted, not of
         # the mixture standing in the column. A column splitting acetone from

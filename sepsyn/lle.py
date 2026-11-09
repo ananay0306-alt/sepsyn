@@ -154,7 +154,8 @@ def _split_at(tmo, a: str, b: str, x: float, T_K: float,
 
 
 def find_liquid_split(names: Sequence[str],
-                      P_Pa: float = 101325.0) -> LiquidSplit | None:
+                      P_Pa: float = 101325.0,
+                      overrides=None) -> LiquidSplit | None:
     """First liquid-liquid split found scanning composition, or None.
 
     Each composition is tested at ITS OWN bubble temperature, because that is
@@ -175,7 +176,11 @@ def find_liquid_split(names: Sequence[str],
     import numpy as np
     import thermosteam as tmo
 
-    skip = {frozenset(p.components) for p in measured_miscible_pairs(names)}
+    # `overrides` lets a caller that already looked the pairs up pass them in
+    # rather than resolving every name a second time.
+    if overrides is None:
+        overrides = measured_miscible_pairs(names)
+    skip = {frozenset(p.components) for p in overrides}
     for a, b in itertools.combinations(names, 2):
         if frozenset((a, b)) in skip:
             continue

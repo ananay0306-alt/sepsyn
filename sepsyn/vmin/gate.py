@@ -28,12 +28,9 @@ class AzeotropeBlocksSelection(ValueError):
     def __init__(self, azeotropes: list[Azeotrope], P_Pa: float):
         self.azeotropes = azeotropes
         self.P_Pa = P_Pa
-        pairs = "; ".join(
-            f"{a.components[0]}/{a.components[1]} at x = {a.x[0]:.3f} "
-            f"{a.components[0]}, {a.T_K:.1f} K"
-            for a in azeotropes)
+        pairs = "; ".join(a.describe() for a in azeotropes)
         super().__init__(
-            f"azeotrope at {P_Pa / 1e5:.3f} bar: {pairs}. Every sharp-split "
+            f"azeotrope: {pairs}. Every sharp-split "
             f"train has to separate that pair, so no sequence of ordinary "
             f"columns exists and no minimum vapour is reported")
 
@@ -47,9 +44,7 @@ def azeotrope_gate(feed, P_Pa: float) -> list[Azeotrope]:
 def format_refusal(exc: AzeotropeBlocksSelection) -> str:
     lines = ["THIS SEPARATION CANNOT BE PERFORMED AS SPECIFIED", ""]
     for a in exc.azeotropes:
-        lines.append(f"  AZEOTROPE  {a.components[0]} / {a.components[1]}  "
-                     f"x = {a.x[0]:.3f} {a.components[0]}, {a.T_K:.1f} K, "
-                     f"{a.P_Pa / 1e5:.3f} bar")
+        lines.append(f"  AZEOTROPE  {a.describe()}")
     lines += [
         "",
         "  A train of sharp splits separates every pair somewhere, so one",

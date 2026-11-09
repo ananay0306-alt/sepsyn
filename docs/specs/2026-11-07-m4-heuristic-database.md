@@ -73,6 +73,7 @@ database format first proves the schema on content that is already measured.
 
 ## Not yet
 
-- The `--sequence` (cost) scorecard still prints proxy code names.
+- ~~The `--sequence` (cost) scorecard still prints proxy code names.~~ Done
+  11-09: both reports print id, statement and citation.
 - No MCP tool lists heuristics.
 - Confirm Harbert's wording, and the Douglas reference, from the originals.

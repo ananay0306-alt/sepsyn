@@ -22,15 +22,8 @@ def catalan(n_components: int) -> int:
 
 
 def _heuristic_lines(name, heuristics):
-    """A proxy's label: its database statement and citation when it has one,
-    its code name when it does not."""
-    from sepsyn.heuristicdb import by_proxy, default_heuristics
-
-    h = by_proxy(default_heuristics() if heuristics is None
-                 else heuristics).get(name)
-    if h is None:
-        return name, None
-    return f"{h.id}  {h.statement}", h.citation
+    from sepsyn.heuristicdb import describe
+    return describe(name, heuristics)
 
 
 def format_vmin(selection, outcome, proxy_scores=(), order=(),

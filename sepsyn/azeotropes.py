@@ -10,6 +10,7 @@ import io
 import itertools
 import warnings
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Sequence
 
 warnings.filterwarnings("ignore")
@@ -53,8 +54,16 @@ class Azeotrope:
     T_K: float
     P_Pa: float
 
+    def describe(self) -> str:
+        """One line, the same everywhere an azeotrope is reported."""
+        a, b = self.components
+        return (f"{a}/{b} at x = {self.x[0]:.3f} {a}, {self.T_K:.1f} K, "
+                f"{self.P_Pa / 1e5:.3f} bar")
 
-def _alpha_curve(chem_a: str, chem_b: str, P_Pa: float) -> list[tuple[float, float, float]]:
+
+@lru_cache(maxsize=512)
+def _alpha_curve(chem_a: str, chem_b: str,
+                 P_Pa: float) -> tuple[tuple[float, float, float], ...]:
     """(x_a, alpha, T) across composition, at the bubble point.
 
     Uses BubblePoint rather than Stream.vle(V=0.0). At V=0 the vapour phase
@@ -63,6 +72,9 @@ def _alpha_curve(chem_a: str, chem_b: str, P_Pa: float) -> list[tuple[float, flo
     composition, which is what relative volatility is defined against.
 
     Chemicals and the solver are built once per pair, not once per point.
+    Cached per (pair, pressure): a --vmin run scans every pair in screening
+    and again in the azeotrope gate, at the same pressure when it is given,
+    and a sequence evaluation screens overlapping pairs column after column.
     """
     import numpy as np
     import thermosteam as tmo
@@ -83,7 +95,7 @@ def _alpha_curve(chem_a: str, chem_b: str, P_Pa: float) -> list[tuple[float, flo
             if min(ya, yb) <= 0:
                 continue
             out.append((x, (ya / x) / (yb / (1.0 - x)), float(T)))
-    return out
+    return tuple(out)
 
 
 def find_azeotropes(names: Sequence[str], P_Pa: float = 101325.0) -> list[Azeotrope]:

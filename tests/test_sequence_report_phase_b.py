@@ -16,8 +16,11 @@ def test_the_scorecard_is_printed(capsys):
     assert main(BASE) == 0
     out = capsys.readouterr().out
     assert "HEURISTICS" in out
-    for name in ("easiest_first", "most_plentiful_first"):
-        assert name in out
+    # Statements and citations from the heuristic database (M4), not code
+    # names.
+    assert "H-05  Perform the easiest separation first" in out
+    assert "H-02  Recover the most plentiful component first" in out
+    assert "Douglas (1985)" in out and "(citation unverified)" in out
 
 
 def test_it_says_what_became_of_each_heuristics_choice(capsys):

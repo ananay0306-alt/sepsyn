@@ -123,7 +123,9 @@ def format_sequencing(ranking: Ranking, scorecard=None, tags=None) -> str:
                 "Every heuristic picked the same sequence on this feed, so "
                 "this scorecard cannot tell them apart. Agreement here is not "
                 "evidence that any of them is right."))
-        for s in sorted(scorecard.scores, key=lambda x: x.name):
+        from sepsyn.heuristicdb import describe, sort_key
+
+        for s in sorted(scorecard.scores, key=lambda x: sort_key(x.name)):
             if s.picked_winner:
                 verdict = "picked the winner"
             elif s.sequence_status == "undetermined":
@@ -134,7 +136,10 @@ def format_sequencing(ranking: Ranking, scorecard=None, tags=None) -> str:
                 verdict = "named a sequence that could not be costed"
             else:
                 verdict = f"{s.cost_penalty:+.1%} worse than the winner"
-            lines.append(f"    {s.name:<22} {verdict}")
+            heading, citation = describe(s.name)
+            lines.append(f"    {heading:<52}{verdict}")
+            if citation:
+                lines.extend(_wrap("      ", citation))
             lines.extend(_wrap("      ", s.sequence_name))
 
     if ranking.undetermined:

@@ -125,3 +125,20 @@ def applicable(heuristics, n_components: int) -> tuple[Heuristic, ...]:
 
 def by_proxy(heuristics) -> dict[str, Heuristic]:
     return {h.proxy: h for h in heuristics}
+
+
+def describe(proxy: str, heuristics=None) -> tuple[str, str | None]:
+    """A proxy's label for a report: "H-02  statement" and its citation when
+    the database has it, the code name and no citation when it does not."""
+    h = by_proxy(default_heuristics() if heuristics is None
+                 else heuristics).get(proxy)
+    if h is None:
+        return proxy, None
+    return f"{h.id}  {h.statement}", h.citation
+
+
+def sort_key(proxy: str, heuristics=None) -> str:
+    """Order scores by heuristic id, then code name for any without one."""
+    h = by_proxy(default_heuristics() if heuristics is None
+                 else heuristics).get(proxy)
+    return h.id if h else "~" + proxy

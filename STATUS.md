@@ -24,7 +24,7 @@ Updated 2026-11-08. Owner: Ananay Khandelwal (sole). Check this file; it is the 
 | M2 Task 6, the comparison | DONE. Gap reported only when every assertion holds. Binary: about 4 % on duties. Alkanes: shortcut UNDER-predicts condenser duty by 70 %, reboiler by 25 %. Both runs recorded as fixtures | `sepsyn/crossvalidate.py` |
 | M5, LLM interface | DONE as an MCP server: five tools wrapping the CLI, tested over real stdio | `sepsyn/mcp_server.py` |
 | BioSTEAM 2x Rmin question | CLOSED AS A KNOWN LIMIT 11-08. Rigorous V 59.6 at 21 stages, 39.6 at 30; three more configurations above 30 (reflux specs, flow specs, Wang-Henke) also failed to converge. Unresolved which V_min is right; both are consistent with every converged point | `docs/findings/2026-11-07-the-alkane-bound-test.md` |
-| M4 | FIRST SLICE 11-08. Five cited sequencing heuristics, scored against the minimum-vapour optimum in `--vmin`; easiest-first's citation (Harbert 1957) marked unverified | `sepsyn/heuristics.yaml`, `docs/specs/2026-11-07-m4-heuristic-database.md` |
+| M4 | DONE 11-09 (both reports cite). FIRST SLICE 11-08. Five cited sequencing heuristics, scored against the minimum-vapour optimum in `--vmin`; easiest-first's citation (Harbert 1957) marked unverified | `sepsyn/heuristics.yaml`, `docs/specs/2026-11-07-m4-heuristic-database.md` |
 | Hafi's condenser/reboiler point | DROPPED 11-08. Hafi has left the project and the point was never transcribed. The measured condenser/reboiler gap is tracked under the alkane bound test | |
 
 ## R-09 answered by design, 2026-11-08
@@ -57,9 +57,9 @@ cleanups left open.
 | Multicomponent feed-stage mapping unverified | Named as unattributed (7 vs 6 on the alkanes, 1.7 % reboiler) |
 | `--vmin --json` did not record an azeotrope refusal | Written under `"selection"` |
 
-Open cleanups: the azeotrope scan runs twice on `--vmin`; the refusal text
-exists in three copies; measured-miscible pairs computed twice per record;
-"201-point scan" hardcoded in the MCP tool.
+The four cleanups: DONE 11-09. The per-pair azeotrope scan is cached by
+pressure; one `Azeotrope.describe()` replaces three copies; measured-miscible
+pairs are looked up once per record; the MCP tool reads `SCAN_POINTS`.
 
 ## Environment: FIXED 2026-08-30
 
